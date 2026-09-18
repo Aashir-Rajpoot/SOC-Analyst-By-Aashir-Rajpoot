@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — Muhammad Aashir Abbas | SOC Analyst</title>
+<meta name="description" content="Analyst dossier: Muhammad Aashir Abbas — Cyber Security student, digital creator and builder of six digital worlds.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="soc.css">
+<link rel="stylesheet" href="brand.css">
+<link rel="stylesheet" href="extras.css">
+<script src="themes.js"></script>
+<style>
+  /* ---- Dossier layout: distinct from the console UI, same token system ----
+     Concept: a declassified analyst personnel file. Large index numerals,
+     a fixed case-file rail, monospace meta labels (matches the platform's
+     --mono), generous serif-free reading measure, one deliberate accent
+     motion (the portrait reveal) rather than scattered hover effects. */
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body.dossier{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);line-height:1.6;
+  }
+  .dossier a{color:inherit}
+  .dossier-top{
+    position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
+    padding:.75rem 1.4rem;background:var(--ink);color:#eef2f5;border-bottom:1px solid rgba(255,255,255,.08);
+    gap:1rem;flex-wrap:wrap;
+  }
+  .dossier-top .lockup{display:flex;align-items:center;gap:.55rem;font-weight:700;letter-spacing:.02em}
+  .dossier-top .lockup img{height:24px;width:auto;background:#fff;border-radius:4px;padding:2px 4px}
+  .dossier-top nav{display:flex;gap:1.1rem;font-size:.82rem}
+  .dossier-top nav a{opacity:.8;text-decoration:none;white-space:nowrap}
+  .dossier-top nav a:hover{opacity:1;text-decoration:underline}
+  .dossier-top .home-btn{
+    font-size:.8rem;border:1px solid rgba(255,255,255,.25);padding:.35rem .7rem;border-radius:5px;
+    text-decoration:none;flex:0 0 auto;
+  }
+
+  .rail{position:fixed;left:0;top:0;bottom:0;width:3px;background:var(--line);z-index:5}
+  .rail i{display:block;width:100%;background:var(--accent);height:0;transition:height .1s linear}
+
+  /* ---- Hero / portrait dossier card ---- */
+  .hero{
+    min-height:88vh;display:grid;grid-template-columns:1.05fr 1fr;align-items:center;gap:2.5rem;
+    padding:3.2rem 6vw 3rem;position:relative;overflow:hidden;
+    background:
+      radial-gradient(60% 55% at 14% 8%, var(--accent-soft) 0%, transparent 60%),
+      var(--paper);
+  }
+  .hero__meta{font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;color:var(--muted);margin-bottom:1rem}
+  .hero__meta b{color:var(--accent)}
+  .hero h1{
+    font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.03;margin:0 0 .3rem;letter-spacing:-.01em;font-weight:800;
+  }
+  .hero h1 span{display:block;font-size:.42em;font-weight:600;color:var(--muted);margin-top:.5rem;letter-spacing:0}
+  .hero__tags{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.6rem}
+  .hero__tags span{
+    font-family:var(--mono);font-size:.72rem;border:1px solid var(--line);border-radius:999px;
+    padding:.28rem .7rem;color:var(--muted);background:var(--surface);
+  }
+  .hero__scroll{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+  .hero__scroll .ln{width:26px;height:1px;background:var(--muted)}
+
+  .portrait-wrap{position:relative;justify-self:center}
+  .portrait{
+    width:min(340px,80vw);aspect-ratio:3/4;border-radius:14px;overflow:hidden;position:relative;
+    box-shadow:0 30px 70px rgba(0,0,0,.28);border:1px solid var(--line);
+    opacity:0;transform:translateY(18px) scale(.98);animation:portraitIn 1s cubic-bezier(.2,1,.3,1) .15s forwards;
+  }
+  @keyframes portraitIn{to{opacity:1;transform:translateY(0) scale(1)}}
+  .portrait img{width:100%;height:100%;object-fit:cover;display:block}
+  .portrait__tag{
+    position:absolute;left:.8rem;bottom:.8rem;background:rgba(10,14,20,.72);color:#fff;
+    font-family:var(--mono);font-size:.68rem;padding:.35rem .55rem;border-radius:5px;backdrop-filter:blur(3px);
+  }
+  .portrait__frame{
+    position:absolute;inset:-10px;border:1px solid var(--accent);border-radius:18px;opacity:.4;pointer-events:none;
+  }
+
+  /* ---- section shell shared by all "Index" sections ---- */
+  .idx{padding:5.5rem 6vw;border-top:1px solid var(--line);opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}
+  .idx.in{opacity:1;transform:translateY(0)}
+  .idx--alt{background:var(--panel)}
+  .idx__head{display:grid;grid-template-columns:auto 1fr;gap:1.4rem;align-items:start;margin-bottom:2.2rem}
+  .idx__num{
+    font-family:var(--mono);font-size:clamp(3rem,7vw,5.2rem);font-weight:800;color:var(--accent-soft);
+    line-height:.85;user-select:none;
+  }
+  .idx__title{margin:.4rem 0 .3rem;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.01em}
+  .idx__kicker{font-family:var(--mono);font-size:.75rem;color:var(--muted);letter-spacing:.05em}
+  .idx__lede{max-width:66ch;color:var(--ink-2);font-size:1.02rem}
+
+  .measure{max-width:70ch}
+  .measure p{margin:0 0 1rem}
+
+  /* ---- personal info dossier grid ---- */
+  .dossier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .dossier-grid div{background:var(--surface);padding:1.1rem 1.3rem}
+  .dossier-grid dt{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
+  .dossier-grid dd{margin:0;font-size:1.02rem;font-weight:600}
+
+  /* ---- education ---- */
+  .edu-list{display:flex;flex-direction:column;gap:0}
+  .edu-item{display:grid;grid-template-columns:120px 1fr;gap:1.4rem;padding:1.3rem 0;border-top:1px solid var(--line)}
+  .edu-item:first-child{border-top:none}
+  .edu-item .badge{font-family:var(--mono);font-size:.72rem;color:var(--accent);align-self:start;padding-top:.2rem}
+  .edu-item h3{margin:0 0 .25rem;font-size:1.12rem}
+  .edu-item p{margin:.15rem 0;color:var(--muted);font-size:.92rem}
+
+  /* ---- skills ---- */
+  .skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem}
+  .skill-card{
+    border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:1.15rem 1.25rem;
+    transition:border-color .15s ease;
+  }
+  .skill-card:hover{border-color:var(--accent)}
+  .skill-card .no{font-family:var(--mono);font-size:.72rem;color:var(--accent);display:block;margin-bottom:.4rem}
+  .skill-card h3{margin:.1rem 0 .35rem;font-size:1.02rem}
+  .skill-card p{margin:0;color:var(--muted);font-size:.88rem}
+
+  /* ---- certificates ---- */
+  .cert-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.1rem}
+  .cert-card{border:1px solid var(--line);background:var(--surface);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .cert-card__prev{aspect-ratio:16/10;background:var(--panel);overflow:hidden}
+  .cert-card__prev img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+  .cert-card__body{padding:1rem 1.1rem;flex:1;display:flex;flex-direction:column;gap:.35rem}
+  .cert-card__body h3{margin:0;font-size:.98rem}
+  .cert-card__body span{color:var(--muted);font-size:.82rem}
+  .cert-card__links{display:flex;gap:.6rem;margin-top:.5rem}
+  .cert-card__links a{font-size:.8rem;font-weight:600;color:var(--accent);text-decoration:none}
+  .cert-card__links a:hover{text-decoration:underline}
+
+  /* ---- projects ---- */
+  .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.1rem}
+  .proj-card{
+    border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:1.2rem 1.3rem;
+    display:flex;flex-direction:column;gap:.5rem;text-decoration:none;color:inherit;
+    transition:transform .15s ease,box-shadow .15s ease;
+  }
+  .proj-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.1)}
+  .proj-card .no{font-family:var(--mono);font-size:.72rem;color:var(--accent)}
+  .proj-card h3{margin:0;font-size:1.05rem}
+  .proj-card .tags{font-size:.78rem;color:var(--muted)}
+  .proj-card .by{font-size:.78rem;color:var(--muted);margin-top:auto}
+  .proj-card .link{font-size:.82rem;font-weight:700;color:var(--accent)}
+
+  /* ---- why I build ---- */
+  .why-list{counter-reset:why;display:flex;flex-direction:column;gap:0}
+  .why-item{display:grid;grid-template-columns:56px 1fr;gap:1.1rem;padding:1rem 0;border-top:1px solid var(--line)}
+  .why-item:first-child{border-top:none}
+  .why-item .no{font-family:var(--mono);color:var(--accent);font-weight:700}
+  .why-item p{margin:0;color:var(--ink-2)}
+
+  /* ---- visual story / lightbox ---- */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+  .gallery button{
+    border:1px solid var(--line);background:var(--surface);padding:0;border-radius:10px;overflow:hidden;cursor:zoom-in;
+    aspect-ratio:4/5;
+  }
+  .gallery img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s ease}
+  .gallery button:hover img{transform:scale(1.04)}
+  .lightbox{
+    position:fixed;inset:0;background:rgba(6,9,13,.9);display:none;align-items:center;justify-content:center;
+    z-index:200;padding:2rem;
+  }
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:min(90vw,900px);max-height:85vh;border-radius:8px;box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .lightbox button{position:absolute;top:1.2rem;right:1.4rem;background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer}
+
+  /* ---- connect ---- */
+  .connect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.8rem}
+  .connect-card{
+    border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:.95rem 1.1rem;
+    display:flex;align-items:center;justify-content:space-between;text-decoration:none;color:inherit;font-weight:600;
+  }
+  .connect-card:hover{border-color:var(--accent);color:var(--accent)}
+  .connect-card span{font-family:var(--mono);font-size:.72rem;color:var(--muted);font-weight:400}
+
+  /* ---- closing ---- */
+  .closing{
+    padding:6.5rem 6vw;text-align:center;background:var(--ink);color:#eef2f5;
+  }
+  .closing h2{font-size:clamp(1.9rem,5vw,3.2rem);margin:0 0 .5rem;font-weight:800}
+  .closing p{color:#a9b6c2;margin:0 0 1.6rem}
+  .closing a{display:inline-block;font-family:var(--mono);font-size:.82rem;border:1px solid rgba(255,255,255,.3);padding:.6rem 1.1rem;border-radius:6px;text-decoration:none;color:#eef2f5}
+  .closing a:hover{border-color:#fff}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;padding-top:2.2rem;min-height:auto}
+    .portrait-wrap{order:-1}
+    .idx__head{grid-template-columns:1fr}
+    .edu-item{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .portrait,.idx{animation:none!important;transition:none!important;opacity:1!important;transform:none!important}
+  }
+</style>
+</head>
+<body class="dossier">
+
+<div class="rail"><i id="railFill"></i></div>
+
+<header class="dossier-top">
+  <div class="lockup"><img src="logo.png" alt="">SOC Analyst <span style="opacity:.6;font-weight:400">— About</span></div>
+  <nav>
+    <a href="#profile">Profile</a>
+    <a href="#education">Education</a>
+    <a href="#skills">Skills</a>
+    <a href="#certificates">Certificates</a>
+    <a href="#projects">Work</a>
+    <a href="#connect">Connect</a>
+  </nav>
+  <a class="home-btn" href="index.html">&larr; Back to platform</a>
+</header>
+
+<!-- ================= HERO / PORTRAIT ================= -->
+<section class="hero" id="top">
+  <div>
+    <div class="hero__meta">FILE NO. <b>002</b> — FULL PROFILE — DECLASSIFIED FOR PUBLIC VIEW</div>
+    <h1>Muhammad Aashir Abbas<span>Known as Aashir Rajpoot — Cyber Security student, digital creator &amp; builder of six digital worlds.</span></h1>
+    <div class="hero__tags">
+      <span>Cyber Security · IUB</span>
+      <span>DAE — IT</span>
+      <span>Web &amp; Frontend</span>
+      <span>Bahawalpur, Pakistan</span>
+    </div>
+    <div class="hero__scroll"><span class="ln"></span> SCROLL TO EXPLORE</div>
+  </div>
+  <div class="portrait-wrap">
+    <div class="portrait">
+      <img src="aashir-profile.jpeg" alt="Portrait of Muhammad Aashir Abbas">
+      <span class="portrait__tag">MUHAMMAD AASHIR ABBAS</span>
+    </div>
+    <div class="portrait__frame" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- ================= INDEX I — WHO IS AASHIR ================= -->
+<section class="idx" id="profile">
+  <div class="idx__head">
+    <div class="idx__num">I</div>
+    <div>
+      <div class="idx__kicker">INDEX — I</div>
+      <h2 class="idx__title">Who Is Aashir?</h2>
+    </div>
+  </div>
+  <div class="measure">
+    <p>Muhammad Aashir Abbas is a technology-focused student and digital creator with an interest in software, cybersecurity, web development, and digital design. His work combines academic learning with practical projects, including web applications and digital tools developed to explore different areas of technology.</p>
+    <p>Each project provides an opportunity to apply technical concepts in a practical environment while developing a broader understanding of modern digital technologies. This page brings together selected work, projects, and areas of interest, reflecting an ongoing journey of learning, experimentation, and practical development.</p>
+  </div>
+</section>
+
+<!-- ================= INDEX II — PERSONAL INFORMATION ================= -->
+<section class="idx idx--alt">
+  <div class="idx__head">
+    <div class="idx__num">II</div>
+    <div>
+      <div class="idx__kicker">INDEX — II</div>
+      <h2 class="idx__title">Personal Information</h2>
+      <p class="idx__lede">The essentials — who he is, on and off the record.</p>
+    </div>
+  </div>
+  <dl class="dossier-grid">
+    <div><dt>Full Name</dt><dd>Muhammad Aashir Abbas</dd></div>
+    <div><dt>Nickname / Professional Name</dt><dd>Aashir Rajpoot</dd></div>
+    <div><dt>Lineage</dt><dd>Rajpoot</dd></div>
+    <div><dt>Currently Studying</dt><dd>Cyber Security — The Islamia University of Bahawalpur</dd></div>
+  </dl>
+</section>
+
+<!-- ================= INDEX III — EDUCATION ================= -->
+<section class="idx" id="education">
+  <div class="idx__head">
+    <div class="idx__num">III</div>
+    <div>
+      <div class="idx__kicker">INDEX — III</div>
+      <h2 class="idx__title">Education</h2>
+    </div>
+  </div>
+  <div class="edu-list">
+    <div class="edu-item">
+      <span class="badge">3RD SEM<br>CURRENT</span>
+      <div>
+        <h3>Cyber Security — The Islamia University of Bahawalpur</h3>
+        <p>Currently in progress.</p>
+      </div>
+    </div>
+    <div class="edu-item">
+      <span class="badge">3-YEAR<br>COMPLETED</span>
+      <div>
+        <h3>DAE — Information Technology (IT), Government College of Technology</h3>
+        <p>3-year diploma, completed.</p>
+      </div>
+    </div>
+  </div>
+  <p class="measure" style="margin-top:1.6rem;color:var(--ink-2)">Studying Cyber Security at The Islamia University of Bahawalpur has sharpened how he thinks about every project he builds — spot the weak point before it's exploited, design defensively, and never trust input blindly. Paired with a completed DAE diploma in Information Technology from Government College of Technology, that mindset shapes how he approaches everything from architecture to interface.</p>
+</section>
+
+<!-- ================= INDEX IV — SKILLS ================= -->
+<section class="idx idx--alt" id="skills">
+  <div class="idx__head">
+    <div class="idx__num">IV</div>
+    <div>
+      <div class="idx__kicker">INDEX — IV</div>
+      <h2 class="idx__title">My Skills</h2>
+      <p class="idx__lede">Eleven areas he works with and continues to learn — not mastery claims, just honest ground covered.</p>
+    </div>
+  </div>
+  <div class="skill-grid" id="skillGrid"></div>
+</section>
+
+<!-- ================= INDEX V — CERTIFICATES ================= -->
+<section class="idx" id="certificates">
+  <div class="idx__head">
+    <div class="idx__num">V</div>
+    <div>
+      <div class="idx__kicker">INDEX — V</div>
+      <h2 class="idx__title">Certificates &amp; Credentials</h2>
+      <p class="idx__lede">A dedicated space for his certifications and credentials as they're completed and added.</p>
+    </div>
+  </div>
+  <div class="cert-grid" id="certGrid"></div>
+</section>
+
+<!-- ================= INDEX VI — THINGS I BUILD ================= -->
+<section class="idx idx--alt" id="projects">
+  <div class="idx__head">
+    <div class="idx__num">VI</div>
+    <div>
+      <div class="idx__kicker">INDEX — VI</div>
+      <h2 class="idx__title">Things I Build</h2>
+      <p class="idx__lede">Six published projects, each a small, complete idea shipped end to end.</p>
+    </div>
+  </div>
+  <div class="proj-grid" id="projGrid"></div>
+</section>
+
+<!-- ================= INDEX VII — WHY I BUILD ================= -->
+<section class="idx">
+  <div class="idx__head">
+    <div class="idx__num">VII</div>
+    <div>
+      <div class="idx__kicker">INDEX — VII</div>
+      <h2 class="idx__title">Why I Build</h2>
+    </div>
+  </div>
+  <div class="why-list" id="whyList"></div>
+</section>
+
+<!-- ================= INDEX VIII — VISUAL STORY ================= -->
+<section class="idx idx--alt">
+  <div class="idx__head">
+    <div class="idx__num">VIII</div>
+    <div>
+      <div class="idx__kicker">INDEX — VIII</div>
+      <h2 class="idx__title">Visual Story</h2>
+    </div>
+  </div>
+  <div class="gallery" id="gallery"></div>
+</section>
+
+<!-- ================= INDEX IX — CONNECT ================= -->
+<section class="idx" id="connect">
+  <div class="idx__head">
+    <div class="idx__num">IX</div>
+    <div>
+      <div class="idx__kicker">INDEX — IX</div>
+      <h2 class="idx__title">Connect With Me</h2>
+      <p class="idx__lede">Find him online.</p>
+    </div>
+  </div>
+  <div class="connect-grid" id="connectGrid"></div>
+</section>
+
+<!-- ================= CLOSING ================= -->
+<section class="closing">
+  <h2>Now You Know</h2>
+  <p>the person behind it.</p>
+  <a href="index.html">Return to the SOC training platform</a>
+</section>
+
+<div class="lightbox" id="lightbox"><button id="lbClose" aria-label="Close">&#10005;</button><img id="lbImg" src="" alt=""></div>
+
+<script src="ai-assistant.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = function (s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+
+  /* ---- skills ---- */
+  var SKILLS = [
+    ["01","Cyber Security","Thinking in threats, hardening what he builds — currently his field of study."],
+    ["02","Networking & IT Infrastructure","A grounding from his DAE in Information Technology at Government College of Technology — systems, networks and how they hold together."],
+    ["03","Ethical Hacking Fundamentals","Learning to probe for weaknesses responsibly, as an extension of his cyber security studies."],
+    ["04","Cloud","Infrastructure that scales without drama."],
+    ["05","Web & Frontend","Fast, accessible, modern web experiences."],
+    ["06","Design & UI/UX","Visual systems with real intention."],
+    ["07","E-Commerce","Storefronts built to convert and last."],
+    ["08","Digital Marketing","Reaching the right people, honestly."],
+    ["09","Data Analytics","Patterns, numbers and problem-solving."],
+    ["10","Content Creation & Photography","Visual storytelling, from the gallery project to the shots on this page."],
+    ["11","Problem Solving & Project Management","Taking an idea from a rough sketch to something finished and shipped."]
+  ];
+  document.getElementById("skillGrid").innerHTML = SKILLS.map(function (s) {
+    return '<div class="skill-card"><span class="no">' + s[0] + '</span><h3>' + esc(s[1]) + '</h3><p>' + esc(s[2]) + '</p></div>';
+  }).join("");
+
+  /* ---- certificates ---- */
+  var BASE = "https://muhammadaashirabbas.aashirrajpoot757.workers.dev/";
+  var CERTS = [
+    ["Data Visualization with Python","Cholistan University of Veterinary & Animal Sciences","python-jub-certificate.pdf","python-jub-certificate.jpg"],
+    ["Data Analytics","Certiport · CertNexus · Pearson VUE","data-analytics-certificate.pdf","data-analytics-certificate.jpg"],
+    ["Virtual Assistant (Amazon)","Trade Testing Board, Govt. of the Punjab","amazon-va-certificate.pdf","amazon-va-certificate.jpg"],
+    ["Provisional & Character Certificate","The Nexus Education System, Bahawalpur","character-certificate-nexus.pdf","character-certificate-nexus.jpg"],
+    ["Character Certificate","Government College of Technology, Bahawalpur","gct-character-certificate.pdf","gct-character-certificate.jpg"],
+    ["DAE — Computer Information Technology","Punjab Board of Technical Education, Lahore","dae-it-result.pdf","dae-it-result.jpg"]
+  ];
+  document.getElementById("certGrid").innerHTML = CERTS.map(function (c) {
+    var pdf = BASE + c[2], img = BASE + c[3];
+    return '<div class="cert-card"><div class="cert-card__prev"><img src="' + img + '" alt="' + esc(c[0]) + ' preview" loading="lazy" data-zoom="' + img + '"></div>' +
+      '<div class="cert-card__body"><h3>' + esc(c[0]) + '</h3><span>' + esc(c[1]) + '</span>' +
+      '<div class="cert-card__links"><a href="' + pdf + '" target="_blank" rel="noopener">View certificate (PDF)</a></div></div></div>';
+  }).join("");
+
+  /* ---- projects ---- */
+  var PROJ = [
+    ["01","Aashir Portfolio","Personal · Professional","A personal portfolio site presenting his work and background.","https://aashir-rajpoot.github.io/Aashir-Portfolio/"],
+    ["02","Aashir Gallery","Photography · Visual","A photo gallery site for browsing and presenting images.","https://aashir-rajpoot.github.io/aashirgallery/"],
+    ["03","Aashir Weather","Utility · Weather","A weather application showing live conditions and forecasts.","https://aashir-rajpoot.github.io/AashirRajpoot-Weather/"],
+    ["04","Aashir Dictionary","Reference · Language","A dictionary tool for looking up word meanings quickly.","https://aashir-rajpoot.github.io/Aashirrajpootdictionary/"],
+    ["05","Aashir Expense Tracker","Finance · Data","A tool for logging and tracking everyday expenses.","https://aashir-rajpoot.github.io/aashir-expense-tracker/"],
+    ["06","Quran Read","Reading · Reflection","A reading tool built for a simple, focused Quran reading experience.","https://aashir-rajpoot.github.io/quranread/"]
+  ];
+  document.getElementById("projGrid").innerHTML = PROJ.map(function (p) {
+    return '<a class="proj-card" href="' + p[4] + '" target="_blank" rel="noopener">' +
+      '<span class="no">' + p[0] + '</span><h3>' + esc(p[1]) + '</h3><span class="tags">' + esc(p[2]) + '</span>' +
+      '<p style="margin:.1rem 0;color:var(--ink-2);font-size:.9rem">' + esc(p[3]) + '</p>' +
+      '<span class="by">Built by Muhammad Aashir Abbas</span><span class="link">Visit project &rarr;</span></a>';
+  }).join("");
+
+  /* ---- why I build ---- */
+  var WHY = [
+    "Learning by implementation — finishing a real project teaches more than any tutorial.",
+    "Solving small, practical problems with something people can actually use.",
+    "Experimenting with new tools and technology in a low-stakes, hands-on way.",
+    "Combining design and function so a project looks right and works right.",
+    "Improving with every project — each one a little better than the last."
+  ];
+  document.getElementById("whyList").innerHTML = WHY.map(function (w, i) {
+    return '<div class="why-item"><span class="no">0' + (i + 1) + '</span><p>' + esc(w) + '</p></div>';
+  }).join("");
+
+  /* ---- gallery ---- */
+  var IMAGES = [
+    BASE + "muhammad%20Aashir.jpeg",
+    BASE + "Aashir%20Abbas.jpeg",
+    BASE + "AashirRajpoot.jpeg"
+  ];
+  document.getElementById("gallery").innerHTML = IMAGES.map(function (src) {
+    return '<button type="button" data-zoom="' + src + '"><img src="' + src + '" alt="Aashir Abbas" loading="lazy"></button>';
+  }).join("");
+
+  /* ---- connect ---- */
+  var LINKS = [
+    ["Facebook","https://www.facebook.com/share/1DmQ7qDxAf/"],
+    ["LinkedIn","https://www.linkedin.com/in/muhammad-aashir-abbas-9679b0279"],
+    ["Instagram","https://www.instagram.com/aashirrajpoot757"],
+    ["YouTube","https://youtube.com/@aashirnovavax"],
+    ["Threads","https://www.threads.com/@aashirrajpoot757"],
+    ["GitHub","https://github.com/Aashir-Rajpoot"],
+    ["Fiverr","https://www.fiverr.com/s/NeBWVEN"]
+  ];
+  document.getElementById("connectGrid").innerHTML = LINKS.map(function (l) {
+    return '<a class="connect-card" href="' + l[1] + '" target="_blank" rel="noopener">' + esc(l[0]) + ' <span>&rarr;</span></a>';
+  }).join("");
+
+  /* ---- lightbox (event delegation for cert + gallery images) ---- */
+  var lb = document.getElementById("lightbox"), lbImg = document.getElementById("lbImg");
+  document.addEventListener("click", function (e) {
+    var z = e.target.closest && e.target.closest("[data-zoom]");
+    if (z) { lbImg.src = z.getAttribute("data-zoom"); lb.classList.add("open"); }
+  });
+  document.getElementById("lbClose").addEventListener("click", function () { lb.classList.remove("open"); lbImg.src = ""; });
+  lb.addEventListener("click", function (e) { if (e.target === lb) { lb.classList.remove("open"); lbImg.src = ""; } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { lb.classList.remove("open"); lbImg.src = ""; } });
+
+  /* ---- scroll reveal (one intentional effect, IntersectionObserver) ---- */
+  var sections = document.querySelectorAll(".idx");
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { threshold: .12 });
+    sections.forEach(function (s) { io.observe(s); });
+  } else {
+    sections.forEach(function (s) { s.classList.add("in"); });
+  }
+
+  /* ---- scroll progress rail ---- */
+  var fill = document.getElementById("railFill");
+  window.addEventListener("scroll", function () {
+    var h = document.documentElement;
+    var pct = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    fill.style.height = Math.max(0, Math.min(100, pct)) + "%";
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>
