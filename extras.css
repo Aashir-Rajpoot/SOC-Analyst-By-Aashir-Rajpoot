@@ -12,6 +12,17 @@
 }
 .topbar nav #navAbout:hover{background:#22303e;color:#fff}
 
+/* ---------- direct Admin Panel shortcut, bottom-left, kept discreet ---------- */
+#adminCornerLink{
+  position:fixed;left:.9rem;bottom:.9rem;z-index:8000;
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.03em;
+  color:var(--muted);background:var(--surface);border:1px solid var(--line);
+  padding:.35rem .65rem;border-radius:999px;text-decoration:none;opacity:.55;
+  transition:opacity .15s ease,color .15s ease,border-color .15s ease;
+}
+#adminCornerLink:hover{opacity:1;color:var(--accent);border-color:var(--accent)}
+@media (max-width:640px){ #adminCornerLink{font-size:.68rem;padding:.3rem .55rem} }
+
 /* ---------- gradient-aware buttons (used by popup + AI + admin) ---------- */
 .grad-btn{
   background:var(--gradient,linear-gradient(135deg,var(--accent),var(--accent)));
