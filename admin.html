@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Panel — SOC Analyst Training</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="soc.css">
+<link rel="stylesheet" href="brand.css">
+<link rel="stylesheet" href="extras.css">
+<script src="themes.js"></script>
+<style>
+  body.admin-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans)}
+
+  /* ---------------- login screen ---------------- */
+  .admin-login{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;
+    background:
+      radial-gradient(60% 60% at 20% 10%,var(--accent-soft) 0%,transparent 60%),
+      var(--paper);
+  }
+  .admin-login__card{
+    width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:2.1rem 1.9rem;box-shadow:0 24px 60px rgba(0,0,0,.15);
+  }
+  .admin-login__logo{display:flex;align-items:center;gap:.6rem;margin-bottom:1.3rem}
+  .admin-login__logo img{height:30px;background:#fff;border-radius:4px;padding:3px 6px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .admin-login__logo strong{font-size:1.02rem}
+  .admin-login__logo span{display:block;font-size:.72rem;color:var(--muted)}
+  .admin-login h1{font-size:1.25rem;margin:.2rem 0 .3rem}
+  .admin-login p.lede{color:var(--muted);font-size:.86rem;margin:0 0 1.3rem}
+  .admin-login label{display:block;font-size:.78rem;font-weight:600;margin:0 0 .3rem;color:var(--ink-2)}
+  .admin-login input{
+    width:100%;padding:.62rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--paper);
+    color:var(--ink);font-size:.95rem;margin-bottom:1rem;box-sizing:border-box;
+  }
+  .admin-login input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .admin-login__err{color:var(--bad,#c0392b);font-size:.82rem;margin:-.4rem 0 .9rem;min-height:1.1em}
+  .admin-login button[type=submit]{width:100%;padding:.7rem;font-size:.95rem}
+  .admin-login__note{margin-top:1.2rem;font-size:.72rem;color:var(--muted);line-height:1.5;border-top:1px solid var(--line);padding-top:.9rem}
+
+  /* ---------------- dashboard shell ---------------- */
+  .admin-shell{display:none;min-height:100vh;grid-template-columns:230px 1fr}
+  .admin-shell.show{display:grid}
+  .admin-side{background:var(--ink);color:#dfe7ee;padding:1.1rem .9rem;display:flex;flex-direction:column;gap:.2rem;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .admin-side__brand{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem 1rem}
+  .admin-side__brand img{height:24px;background:#fff;border-radius:4px;padding:2px 4px}
+  .admin-side__brand strong{font-size:.88rem}
+  .admin-side__brand span{display:block;font-size:.66rem;opacity:.65}
+  .admin-side button{
+    display:flex;align-items:center;gap:.55rem;text-align:left;background:none;border:none;color:#c6d2dc;
+    padding:.58rem .7rem;border-radius:8px;font-size:.86rem;cursor:pointer;font-family:inherit;
+  }
+  .admin-side button:hover{background:rgba(255,255,255,.06);color:#fff}
+  .admin-side button.active{background:var(--accent);color:#fff}
+  .admin-side__sep{height:1px;background:rgba(255,255,255,.1);margin:.6rem .2rem}
+  .admin-side__logout{margin-top:auto}
+
+  .admin-main{padding:1.6rem 2rem 3rem;max-width:1180px}
+  .admin-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.4rem;flex-wrap:wrap}
+  .admin-head h1{margin:0;font-size:1.5rem}
+  .admin-head p{margin:.2rem 0 0;color:var(--muted);font-size:.88rem}
+  .admin-badge{font-family:var(--mono);font-size:.72rem;color:var(--muted);border:1px solid var(--line);padding:.25rem .55rem;border-radius:999px}
+
+  .a-grid{display:grid;gap:1rem}
+  .a-cols-4{grid-template-columns:repeat(4,1fr)}
+  .a-cols-2{grid-template-columns:repeat(2,1fr)}
+  @media (max-width:900px){ .a-cols-4{grid-template-columns:repeat(2,1fr)} .a-cols-2{grid-template-columns:1fr} }
+  @media (max-width:640px){ .a-cols-4{grid-template-columns:1fr} .admin-shell{grid-template-columns:1fr} .admin-side{position:static;height:auto;flex-direction:row;flex-wrap:wrap} .admin-side__logout{margin-top:0} }
+
+  .a-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.2rem}
+  .a-kpi .n{font-size:1.65rem;font-weight:800}
+  .a-kpi .l{font-size:.78rem;color:var(--muted);margin-top:.15rem}
+
+  .a-table{width:100%;border-collapse:collapse;font-size:.86rem}
+  .a-table th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--line);padding:.5rem .6rem}
+  .a-table td{padding:.55rem .6rem;border-bottom:1px solid var(--line-soft)}
+  .a-table tr:hover td{background:var(--panel)}
+  .a-pill{font-size:.7rem;padding:.16rem .5rem;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .a-pill.on{color:#fff;background:var(--ok,#2c6b4f);border-color:transparent}
+  .a-pill.off{color:#fff;background:var(--bad,#8d1b1b);border-color:transparent}
+  .a-pill.auto{color:var(--muted)}
+  .a-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:.32rem .6rem;font-size:.78rem;cursor:pointer}
+  .a-btn:hover{border-color:var(--accent)}
+  .a-btn.danger{color:var(--bad,#c0392b);border-color:var(--bad,#c0392b)}
+  .a-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .a-row{display:flex;gap:.4rem;flex-wrap:wrap}
+
+  .a-toggle{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 0;border-top:1px solid var(--line-soft)}
+  .a-toggle:first-child{border-top:none}
+  .a-toggle__label strong{display:block;font-size:.92rem}
+  .a-toggle__label span{font-size:.78rem;color:var(--muted)}
+  .switch{position:relative;width:42px;height:24px;flex:0 0 auto}
+  .switch input{opacity:0;width:0;height:0}
+  .switch .track{position:absolute;inset:0;background:var(--line);border-radius:999px;cursor:pointer;transition:background .15s}
+  .switch .thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track .thumb{transform:translateX(18px)}
+  .switch input:disabled + .track{opacity:.5;cursor:not-allowed}
+
+  .a-book{display:grid;grid-template-columns:260px 1fr;gap:1.2rem}
+  .a-book__list{border:1px solid var(--line);border-radius:10px;max-height:70vh;overflow-y:auto}
+  .a-book__list button{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--line-soft);padding:.6rem .8rem;cursor:pointer;font-size:.84rem;color:var(--ink)}
+  .a-book__list button:hover{background:var(--panel)}
+  .a-book__list button.active{background:var(--accent-soft);font-weight:700}
+  .a-book__reader{border:1px solid var(--line);border-radius:10px;padding:1.2rem 1.4rem;max-height:70vh;overflow-y:auto}
+  @media (max-width:760px){ .a-book{grid-template-columns:1fr} }
+
+  .a-field{margin-bottom:.9rem}
+  .a-field label{display:block;font-size:.78rem;font-weight:600;margin-bottom:.3rem;color:var(--ink-2)}
+  .a-field input,.a-field select,.a-field textarea{
+    width:100%;padding:.55rem .7rem;border:1px solid var(--line);border-radius:7px;background:var(--paper);
+    color:var(--ink);font-size:.9rem;box-sizing:border-box;font-family:inherit;
+  }
+  .a-modal-backdrop{position:fixed;inset:0;background:rgba(10,14,22,.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:500;padding:1rem}
+  .a-modal-backdrop.open{display:flex}
+  .a-modal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.4rem 1.5rem;max-width:440px;width:100%;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+  .a-modal h3{margin:0 0 .3rem}
+  .a-modal p.sub{color:var(--muted);font-size:.85rem;margin:0 0 1rem}
+  .a-modal__actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:.4rem}
+
+  .a-note{background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;font-size:.82rem;color:var(--ink-2);margin-bottom:1rem}
+  .a-empty{color:var(--muted);font-size:.88rem;padding:1rem 0}
+  .search-in{max-width:280px;margin-bottom:.9rem}
+</style>
+</head>
+<body class="admin-body">
+
+<!-- ================= LOGIN ================= -->
+<div class="admin-login" id="loginScreen">
+  <form class="admin-login__card" id="loginForm" autocomplete="off">
+    <div class="admin-login__logo"><img src="logo.png" alt=""><div><strong>SOC Analyst</strong><span>Platform Administration</span></div></div>
+    <h1>Admin sign in</h1>
+    <p class="lede">Restricted area. This login is separate from the student/user experience.</p>
+    <label for="loginUser">Username</label>
+    <input type="text" id="loginUser" autocomplete="username" required>
+    <label for="loginPass">Password</label>
+    <input type="password" id="loginPass" autocomplete="current-password" required>
+    <div class="admin-login__err" id="loginErr"></div>
+    <button type="submit" class="grad-btn">Sign in</button>
+    <div class="admin-login__note">Frontend-only authentication for this local training install (a client-side credential check, not a server session). No answer keys, hints or grading logic are reachable from this panel. For a production deployment, replace <code>adminLogin()</code> in <code>admin.js</code> with a real server-verified login.</div>
+  </form>
+</div>
+
+<!-- ================= DASHBOARD SHELL ================= -->
+<div class="admin-shell" id="shell">
+  <aside class="admin-side">
+    <div class="admin-side__brand"><img src="logo.png" alt=""><div><strong>SOC Analyst</strong><span>Admin Panel</span></div></div>
+    <button data-tab="overview" class="active">&#128202; Dashboard Overview</button>
+    <button data-tab="levels">&#128274; Levels Management</button>
+    <button data-tab="sections">&#129513; Section Management</button>
+    <button data-tab="book">&#128214; SOC Analyst Book</button>
+    <button data-tab="theme">&#127912; Theme Manager</button>
+    <button data-tab="progress">&#128100; User / Progress Data</button>
+    <button data-tab="settings">&#9881;&#65039; Site Settings</button>
+    <div class="admin-side__sep"></div>
+    <button class="admin-side__logout" id="logoutBtn">&#8592; Logout</button>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-head">
+      <div>
+        <h1 id="pageTitle">Dashboard Overview</h1>
+        <p id="pageSub">Snapshot of the training platform.</p>
+      </div>
+      <span class="a-badge">SOC Analyst Training &middot; Admin Panel</span>
+    </div>
+    <div id="tabBody"></div>
+  </main>
+</div>
+
+<div class="a-modal-backdrop" id="modalBackdrop"><div class="a-modal" id="modalBody"></div></div>
+
+<script src="levels.js"></script>
+<script src="book.js"></script>
+<script src="commands.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
