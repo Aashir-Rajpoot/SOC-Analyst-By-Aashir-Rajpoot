@@ -1,0 +1,292 @@
+[
+{
+ "id":25,"title":"MITRE ATT&CK Investigation","domain":"Frameworks","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"ATT&CK is a catalogue of adversary behaviour organised as tactics (the goal: initial access, execution, persistence, privilege escalation, defence evasion, credential access, discovery, lateral movement, collection, command and control, exfiltration, impact) and techniques (the method, with an ID such as T1059.001). Mapping an incident to ATT&CK produces a shared vocabulary and exposes coverage gaps.",
+  "why":"A mapped incident can be compared against detection coverage, against other incidents and against the actor's known repertoire. Unmapped incidents produce reports nobody can act on.",
+  "look":["One observed behaviour maps to exactly one technique - resist mapping the same event to five IDs","Sub-techniques where the evidence supports the specificity, parent technique where it does not","Tactics with no observed technique - either the attacker skipped the stage or you have a visibility gap","Techniques the actor is known for that you did NOT observe - a hunting hypothesis"],
+  "fp":["Mapping intent rather than evidence inflates the report; map what the logs show","A technique observed once by an automated tool is not the same as sustained operator tradecraft"],
+  "tips":["Build the mapping from your timeline, one event at a time, rather than from memory of the actor profile.","An empty tactic column is a finding worth writing down."]
+ },
+ "case":{"id":"SOC-2026-00701","severity":"MEDIUM","alert":"ATT&CK mapping of the Northwind intrusion for the incident report","host":"Estate","time":"2026-03-05 12:00 UTC","source":"Case file","brief":"Map each confirmed observation to the correct tactic and technique. The mapping goes into the incident report and drives the coverage assessment."},
+ "mitre":"Full mapping exercise",
+ "evidence":[
+  {"name":"Confirmed Observations","rows":[
+   "O1 Spearphishing email with password-protected ZIP containing a .lnk, from a look-alike partner domain",
+   "O2 User executed the .lnk, which launched cmd.exe and hidden PowerShell",
+   "O3 PowerShell disabled AMSI by patching amsiInitFailed via reflection",
+   "O4 HKCU Run value WinUpdateSvc pointing to %TEMP%\\svchost32.exe",
+   "O5 Scheduled task \\Microsoft\\Windows\\NWSync\\HealthCheck downloading a script daily",
+   "O6 WMI __EventFilter + CommandLineEventConsumer pair on SRV-FILE02",
+   "O7 Service binary replacement in a user-writable Program Files directory, yielding SYSTEM",
+   "O8 NTLM brute force against svc_backup from an external address",
+   "O9 LSASS memory read by an unsigned SYSTEM process",
+   "O10 DS-Replication-Get-Changes-All exercised by svc_backup2 on DC-01",
+   "O11 PsExec service creation (PSEXESVC) on three remote hosts using stolen credentials",
+   "O12 HTTPS POST /gate.php beaconing at 600s with jitter to 91.203.5.12",
+   "O13 DNS TXT tunnelling to datasync-77x.net",
+   "O14 Internal SMB named-pipe relay for hosts with no internet route",
+   "O15 7-Zip archives of finance data staged in C:\\ProgramData\\cache",
+   "O16 MFA push bombing followed by attacker MFA device registration on m.chen's cloud account",
+   "O17 Inbox rule created to move security- and finance-related mail to RSS Subscriptions",
+   "O18 Creation of svc_backup2 and addition to Domain Admins"
+  ]},
+  {"name":"Technique Reference","rows":[
+   "T1566.001 Spearphishing Attachment | T1204.002 User Execution: Malicious File | T1059.001 PowerShell",
+   "T1562.001 Impair Defenses: Disable or Modify Tools | T1547.001 Registry Run Keys | T1053.005 Scheduled Task",
+   "T1546.003 WMI Event Subscription | T1574.011 Services Registry Permissions Weakness | T1110 Brute Force",
+   "T1003.001 OS Credential Dumping: LSASS Memory | T1003.006 DCSync | T1021.002 SMB/Windows Admin Shares",
+   "T1569.002 Service Execution | T1071.001 Web Protocols | T1071.004 DNS | T1090.001 Internal Proxy",
+   "T1560.001 Archive via Utility | T1621 MFA Request Generation | T1114.003 Email Forwarding Rule",
+   "T1136.002 Create Account: Domain Account | T1048.003 Exfiltration Over Alternative Protocol"
+  ]},
+  {"name":"Tactic Coverage Worksheet","rows":[
+   "Initial Access: observed | Execution: observed | Persistence: observed | Privilege Escalation: observed",
+   "Defense Evasion: observed | Credential Access: observed | Discovery: observed | Lateral Movement: observed",
+   "Collection: observed | Command and Control: observed | Exfiltration: observed",
+   "Impact: NOT observed (no encryption, destruction or service denial as of 2026-03-05 12:00)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Technique ID for O1 (spearphishing attachment)","type":"keywords","accept":["t1566.001","t1566"],"hint":"Initial Access tactic, attachment sub-technique."},
+  {"id":"q2","label":"Technique ID for O3 (AMSI bypass)","type":"keywords","accept":["t1562.001","t1562"],"hint":"Defence Evasion - impairing a defensive tool."},
+  {"id":"q3","label":"Technique ID for O7 (service binary replacement via weak permissions)","type":"keywords","accept":["t1574.011","t1574"],"hint":"Privilege Escalation through a service misconfiguration."},
+  {"id":"q4","label":"Technique ID for O10 (directory replication abuse)","type":"keywords","accept":["t1003.006","t1003"],"hint":"Credential Access - a specific sub-technique named after the operation."},
+  {"id":"q5","label":"Technique ID for O14 (internal SMB pipe relay)","type":"keywords","accept":["t1090.001","t1090"],"hint":"Command and Control through a host inside the network."},
+  {"id":"q6","label":"Technique ID for O16 (MFA push bombing)","type":"keywords","accept":["t1621"],"hint":"Credential Access - generating repeated multi-factor requests."},
+  {"id":"q7","label":"Which ATT&CK tactic was NOT observed in this incident?","type":"exact","accept":["impact"],"hint":"Read the coverage worksheet - one tactic is marked not observed."},
+  {"id":"q8","label":"Given the actor profile, what does the absence of that tactic most likely mean?","type":"keywords","accept":["not yet","later","still","dwell","planned","upcoming","extortion","before","pending","early"],"hint":"TA-4411's profile places data theft before extortion, and you are on day two of a four-to-seven day dwell."},
+  {"id":"q9","label":"How many distinct tactics were observed in total?","type":"num","accept":["11"],"hint":"Count the tactics marked 'observed' in the worksheet."}
+ ],
+ "decision":"true_positive","severity_answer":"HIGH",
+ "recommend":{"any":["map","report","coverage","navigator","gap","prioritis","prioritiz","detection"],"text":"Publish the ATT&CK mapping with the incident report, overlay it against current detection coverage to expose gaps, and treat the absent Impact tactic as an expected next stage rather than good news."},
+ "timelineKey":[],
+ "hints":["Map from evidence, not from intuition. Take each observation and ask which single technique the logged behaviour demonstrates.","The reference panel contains exactly the techniques you need, plus a few extras. Match by the behaviour described, not by keyword similarity."],
+ "review":"Eleven of twelve tactics were observed - Initial Access through Exfiltration - which alone characterises this as a complete, human-operated intrusion rather than commodity malware. The mappings that matter most: T1562.001 for the AMSI bypass (defence evasion is often under-reported), T1574.011 for the service permissions escalation, T1003.006 for DCSync (the single most severe technique in the incident, because it puts every credential in the domain in the attacker's hands), T1090.001 for the internal pipe relay, and T1621 for the MFA push bombing. Impact is the only absent tactic, and that is not reassurance: TA-4411's profile places data theft before extortion, and you are on day two of a typical four-to-seven day dwell. The mapping's real value is the overlay against detection coverage, which is where the Linux telemetry gap and the missing .lnk-execution rule become visible as organisational findings rather than analyst opinions.",
+ "next":"Technical analysis is complete. The incident manager now needs a response plan: what gets contained, in what order, and what has to be true before the business can be told it is over."
+},
+{
+ "id":26,"title":"Incident Response","domain":"IR","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"Incident response follows a lifecycle: preparation, detection and analysis, containment, eradication, recovery, and lessons learned. Containment is usually staged - short-term actions to stop the bleeding, then longer-term isolation while evidence is preserved. Eradication removes attacker access; recovery restores service with monitoring in place to catch a return.",
+  "why":"Sequencing is everything. Eradicating before you have scoped leaves persistence behind; containing loudly before you have mapped every channel tells the operator to burn their infrastructure and dig in deeper.",
+  "look":["Whether scoping is genuinely complete before eradication begins","Evidence preservation ahead of any action that destroys it - memory before power-off, disk images before rebuild","Credential invalidation that actually covers what was stolen, including Kerberos keys after DCSync","Whether containment actions are simultaneous where the attacker has multiple channels","Recovery criteria defined in advance, not negotiated under pressure"],
+  "fp":["Not every incident needs full crisis handling; over-response has real business cost","Rebuilding hosts that were only exposed, not compromised, wastes capacity"],
+  "tips":["Capture volatile memory before isolating or shutting down a host.","After DCSync, krbtgt must be reset twice with sufficient interval for replication - once is not enough."]
+ },
+ "case":{"id":"SOC-2026-00712","severity":"CRITICAL","alert":"Response plan approval for the Northwind intrusion","host":"Estate","time":"2026-03-05 14:00 UTC","source":"Incident management","brief":"Sequence the response. The incident manager will execute exactly what you specify, in the order you specify it. Identify the correct ordering and the errors in the draft plan prepared by another analyst."},
+ "mitre":"N/A - response",
+ "evidence":[
+  {"name":"Confirmed Scope","rows":[
+   "Compromised hosts: WKS-2041, SRV-LNX-04, SRV-FILE02, SRV-HR01, SRV-SQL01 (5)",
+   "Compromised accounts: svc_backup, deploy, m.chen (cloud+endpoint), svc_backup2 (attacker-created), plus all domain credentials via DCSync",
+   "Persistence: 6 mechanisms across 3 hosts (Run key, scheduled task, service, WMI pair, cron, SSH key) - HR01/SQL01 pending enumeration",
+   "C2 channels: HTTPS 600s, HTTPS 3600s long-sleep, DNS TXT tunnel, internal SMB named pipes",
+   "Data: ~344MB staged, confirmed exfiltration, 1,840 employees in scope",
+   "Not compromised: SRV-PCI01 (blocked by segmentation), WKS-2077 (exposed only), SOC-ANALYST-VM01 (SOC-owned)"
+  ]},
+  {"name":"Draft Response Plan (prepared by another analyst - contains errors)","rows":[
+   "Step 1: Power off SRV-FILE02 immediately to stop the DNS tunnel",
+   "Step 2: Reset m.chen's password",
+   "Step 3: Delete svc_backup2 from Active Directory",
+   "Step 4: Block 91.203.5.12 at the firewall",
+   "Step 5: Rebuild WKS-2041 from the standard image and return it to the user",
+   "Step 6: Reset krbtgt once",
+   "Step 7: Close the incident when beaconing stops",
+   "Step 8: Schedule lessons-learned review within 90 days"
+  ]},
+  {"name":"Response Policy Extract","rows":[
+   "IR-P-01 Volatile memory must be captured before any isolation or shutdown of a host in scope",
+   "IR-P-02 Containment across multiple channels must be executed simultaneously to prevent adversary adaptation",
+   "IR-P-03 Attacker-created accounts are disabled and preserved, never deleted, until forensics completes",
+   "IR-P-04 Session and token revocation must accompany every credential reset for cloud identities",
+   "IR-P-05 After confirmed DCSync, krbtgt is reset twice with at least one full replication cycle between resets",
+   "IR-P-06 Recovery criteria must be defined before recovery begins; absence of beaconing is not a criterion",
+   "IR-P-07 Lessons learned within 10 working days of incident closure"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"What is wrong with Step 1 of the draft plan?","type":"keywords","accept":["memory","volatile","capture","evidence","forensic","ram","image","destroy"],"hint":"Read IR-P-01 and consider what a power-off destroys permanently."},
+  {"id":"q2","label":"What must accompany the password reset in Step 2?","type":"keywords","accept":["revoke","session","token","mfa","remove mfa","device","refresh"],"hint":"IR-P-04, plus recall what the attacker registered on that account."},
+  {"id":"q3","label":"What is wrong with Step 3?","type":"keywords","accept":["disable","preserve","not delete","evidence","forensic","dont delete","do not delete"],"hint":"Read IR-P-03."},
+  {"id":"q4","label":"Why is Step 4 insufficient on its own?","type":"keywords","accept":["dns","tunnel","other channel","long sleep","pipe","internal","3600","multiple","domain"],"hint":"Count how many channels exist in the confirmed scope."},
+  {"id":"q5","label":"What is wrong with Step 5?","type":"keywords","accept":["scope","persistence","other host","premature","eradicat","hr01","sql01","not complete","too early","before"],"hint":"Two hosts still have persistence enumeration pending, and rebuilding one host while the others beacon achieves nothing."},
+  {"id":"q6","label":"How many times must krbtgt be reset, per policy?","type":"num","accept":["2","twice"],"hint":"Read IR-P-05."},
+  {"id":"q7","label":"What is wrong with the closure criterion in Step 7?","type":"keywords","accept":["not a criterion","beacon","long sleep","sleep","defined","criteria","advance","insufficient","dormant"],"hint":"IR-P-06 explicitly rejects this criterion - and recall the 3600-second long-sleep channel."},
+  {"id":"q8","label":"Per policy, within how many working days must lessons learned occur?","type":"num","accept":["10"],"hint":"Read IR-P-07 and compare with Step 8."},
+  {"id":"q9","label":"Which single action should happen FIRST across the whole response?","type":"choice","options":["Capture volatile memory from in-scope hosts","Block the C2 IP","Reset all passwords","Rebuild the file server"],"accept":["capture volatile memory from in-scope hosts"],"hint":"Preservation precedes action for anything that destroys evidence."}
+ ],
+ "decision":"needs_escalation","severity_answer":"CRITICAL",
+ "recommend":{"any":["memory","preserve","simultaneous","coordinated","krbtgt","revoke","disable","stage"],"text":"Reject the draft plan: capture memory first, then execute simultaneous containment across all four channels and five hosts, disable rather than delete svc_backup2, revoke sessions and remove the attacker MFA device alongside resets, reset krbtgt twice, define recovery criteria in advance, and schedule lessons learned within 10 working days."},
+ "timelineKey":[],
+ "hints":["Check the draft against the policy extract line by line. Almost every step violates one policy clause.","Two principles drive the correct order: preserve before you act, and act on every channel at once."],
+ "review":"Every step of the draft is wrong in an instructive way. Powering off SRV-FILE02 destroys memory that holds the C2 configuration, injected code and possibly the archive password (IR-P-01). Resetting m.chen's password without revoking sessions and removing the attacker-registered MFA device leaves the intruder logged in (IR-P-04). Deleting svc_backup2 destroys evidence that should be disabled and preserved (IR-P-03). Blocking one IP leaves the long-sleep channel, the DNS tunnel and the internal pipe relay running (IR-P-02). Rebuilding one workstation before HR01 and SQL01 have even been enumerated is eradication before scoping. One krbtgt reset is insufficient after DCSync (IR-P-05). Absence of beaconing is explicitly not a closure criterion - a 3600-second implant designed to sleep through exactly this moment makes that obvious (IR-P-06). And 90 days for lessons learned is nine times the policy limit. Memory capture comes first.",
+ "next":"Containment is executing. Forensics now needs artefacts from SRV-FILE02 to establish exactly what ran and when, including activity the logs never recorded."
+},
+{
+ "id":27,"title":"Digital Forensics Investigation","domain":"Forensics","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"Forensics recovers evidence from disk and memory artefacts, including things no log recorded. On Windows: prefetch (execution evidence), ShimCache and AmCache (programs present), $MFT and USN journal (file creation and deletion), SRUM (network usage per process), event log files themselves, registry hives, volume shadow copies, and memory for injected code and network state. Order of volatility governs collection: memory first, then disk.",
+  "why":"Attackers delete files and clear logs. Forensic artefacts survive both, and they are what makes findings defensible if the matter reaches lawyers or regulators.",
+  "look":["Prefetch entries for binaries that no longer exist on disk, with run counts and last-run times","ShimCache/AmCache entries proving presence even without execution","USN journal records of file creation and deletion with timestamps","Timestamp anomalies - a $STANDARD_INFORMATION time earlier than $FILE_NAME indicates timestomping","Event log gaps: a cleared log leaves 1102, and an absence of records is itself evidence"],
+  "fp":["Prefetch proves execution, not malice - legitimate software appears there too","Antivirus quarantine and software uninstalls also delete files"],
+  "tips":["Maintain chain of custody with hashes of every image and artefact.","Compare $STANDARD_INFORMATION and $FILE_NAME timestamps whenever a file's dates look convenient."]
+ },
+ "case":{"id":"SOC-2026-00724","severity":"CRITICAL","alert":"Forensic artefact review of SRV-FILE02 disk and memory image","host":"SRV-FILE02","time":"2026-03-05 18:00 UTC","source":"Forensic images (mem 64GB, disk E01)","brief":"Establish what executed on this host, what the attacker deleted, whether timestamps were manipulated, and what memory reveals that the logs did not."},
+ "mitre":"T1070.004 File Deletion / T1070.006 Timestomp / T1070.001 Clear Windows Event Logs",
+ "evidence":[
+  {"name":"Prefetch and Execution Artefacts","rows":[
+   "NWSYNC.EXE-8A21C044.pf run_count=14 first_run=2026-03-04 09:44:02 last_run=2026-03-05 13:02:11 (binary deleted from disk)",
+   "7Z.EXE-9911AA02.pf run_count=3 first_run=2026-03-04 10:01:20 last_run=2026-03-04 22:04:10",
+   "SVC.EXE-4410BB71.pf run_count=1 first_run=2026-03-04 09:43:02 (path: C:\\Program Files\\BackupMgr\\bin\\svc.exe)",
+   "PSEXESVC.EXE-C0091A44.pf run_count=1 first_run=2026-03-04 10:20:22",
+   "AmCache: C:\\ProgramData\\nwsync.exe sha1=a71c... first_seen=2026-03-04 09:44 (entry persists despite deletion)",
+   "ShimCache: C:\\ProgramData\\cache\\stage.exe last_modified=2026-03-04 21:58 (NO prefetch entry - present but never executed)"
+  ]},
+  {"name":"Filesystem and Timeline Artefacts","rows":[
+   "USN journal: FILE_CREATE C:\\ProgramData\\cache\\d1.7z 2026-03-04 10:01:55 | FILE_DELETE 2026-03-04 23:58:02",
+   "USN journal: FILE_CREATE C:\\ProgramData\\cache\\d2.7z 14:10:02 | d3.7z 22:04:40 | both FILE_DELETE 23:58:02",
+   "$MFT: C:\\Program Files\\BackupMgr\\bin\\svc.exe $STANDARD_INFORMATION created=2021-06-14 09:00:00 | $FILE_NAME created=2026-03-04 09:42:05",
+   "Volume Shadow Copy 2026-03-05 00:30 contains d1.7z, d2.7z, d3.7z intact (sha256 recorded, chain of custody logged)",
+   "Security.evtx: EventID=1102 'audit log was cleared' at 2026-03-05 13:05:40 by svc_backup2; records before 2026-03-04 22:00 absent from the live log but present in the shadow copy"
+  ]},
+  {"name":"Memory Analysis","rows":[
+   "Injected RWX region in explorer.exe pid=2140, 284KB, matching nwsync loader signature",
+   "Network connections at capture time: 91.203.5.12:8443 ESTABLISHED (pid 2140), 10.20.9.14:445 (SRV-HR01 pipe)",
+   "Strings in process memory: 'N0rthw1nd2026' (archive password), 'https://91.203.5.12/gate.php', 'NWSYNC_9F21'",
+   "Cached credentials recovered from LSASS region: svc_backup2, m.chen, adm.tovar (adm.tovar logged on 2026-03-04 for INC-20449)",
+   "Command history buffer: 'net group \"Domain Admins\" /domain', 'reg save HKLM\\SAM', 'wevtutil cl Security'"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"How many times did nwsync.exe execute?","type":"num","accept":["14"],"hint":"Read the run_count on the prefetch entry."},
+  {"id":"q2","label":"Which artefact proves execution of a binary that no longer exists on disk?","type":"keywords","accept":["prefetch","pf","amcache"],"hint":"One artefact type records run counts and timestamps independently of the file itself."},
+  {"id":"q3","label":"Which binary was present on the host but never executed?","type":"keywords","accept":["stage.exe","c:\\programdata\\cache\\stage.exe"],"hint":"Look for a ShimCache entry with no corresponding prefetch."},
+  {"id":"q4","label":"What timestamp anomaly exists on svc.exe?","type":"keywords","accept":["timestomp","timestamp","mismatch","2021","different","$file_name","standard_information","backdated","altered"],"hint":"Compare the two $MFT timestamp attributes - one says 2021, the other says the attack window."},
+  {"id":"q5","label":"Why did the attacker manipulate that timestamp?","type":"keywords","accept":["blend","hide","look old","legitimate","evade","avoid","original","conceal","disguise"],"hint":"Consider an analyst sorting files by creation date looking for recent changes."},
+  {"id":"q6","label":"At what time was the Security log cleared, and by which account?","type":"keywords","accept":["13:05","svc_backup2","13:05:40"],"hint":"Look for EventID 1102 in the filesystem artefacts panel."},
+  {"id":"q7","label":"Why did clearing the log fail to destroy the evidence?","type":"keywords","accept":["shadow","volume shadow","vss","copy","backup","recovered","snapshot"],"hint":"One artefact in the panel predates the clearing and preserved the records."},
+  {"id":"q8","label":"What did memory reveal that no log recorded?","type":"keywords","accept":["password","n0rthw1nd2026","injected","credential","archive password","strings","command history","rwx"],"hint":"Several items - the archive password, the injected region, cached credentials and the command history buffer all qualify."},
+  {"id":"q9","label":"Which additional account's credentials were exposed because of an unrelated activity on this host?","type":"exact","accept":["adm.tovar","tovar"],"hint":"Recall the procdump false positive - that admin logged on to a host in scope."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["preserve","custody","reset","rebuild","image","evidence","rotate","forensic"],"text":"Preserve all images and shadow copies under chain of custody, reset adm.tovar and every credential cached on the host, rebuild SRV-FILE02 rather than cleaning it, and record the anti-forensic activity in the incident report."},
+ "timelineKey":["09:43:02","09:44:02","10:01:55","23:58:02","13:05:40"],
+ "hints":["Attackers delete files and clear logs; forensics is largely the study of what survives those actions anyway. Work through each artefact asking what it proves that the live system no longer does.","One binary in these artefacts was staged but never run, and one file has two different creation dates. Both are deliberate."],
+ "review":"The artefacts survive every anti-forensic action taken. Prefetch proves nwsync.exe ran fourteen times between 09:44 on 4 March and 13:02 on 5 March even though the binary was deleted, and AmCache independently corroborates its presence. stage.exe appears in ShimCache with no prefetch entry: staged for a later phase, never executed - almost certainly the next-stage tool, and its absence from execution is why the Impact tactic was never observed. The $MFT shows svc.exe with $STANDARD_INFORMATION backdated to 2021 while $FILE_NAME records 2026-03-04 09:42:05, a timestomp intended to survive a sort-by-date review. The Security log was cleared at 13:05:40 on 5 March by svc_backup2, but the 00:30 shadow copy preserved both the records and all three deleted archives. Memory delivers what no log held: an injected RWX region in explorer.exe, live C2 and internal pipe connections, the archive password in plain text, the operator's command history including 'reg save HKLM\\SAM', and cached credentials for adm.tovar - exposed simply because that administrator logged on to a compromised host during an unrelated support ticket.",
+ "next":"Every host is understood individually. Assemble them into a single correlated narrative across the whole estate, with a timeline that an executive and a regulator can both follow."
+},
+{
+ "id":28,"title":"Multi-Stage Attack Investigation","domain":"Correlation","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"A multi-stage investigation correlates evidence from several hosts, identities and data sources into one narrative: how the attacker entered, how each stage enabled the next, and where the defence succeeded or failed. The output is a single timeline that survives cross-examination.",
+  "why":"Individually investigated hosts produce a list of incidents. Correlated, they produce the actual story - and the story is what drives remediation funding and regulatory position.",
+  "look":["Causal links: each stage must be explained by the one before it","Two intrusion paths converging on one identity or host","Time gaps that indicate operator working hours or handoffs between teams","Controls that worked - they belong in the report as prominently as the failures","The earliest point at which existing telemetry could have caught it"],
+  "fp":["Coincidental timing is not causation - require an artefact linking the stages","An event during the incident window is not automatically part of the incident"],
+  "tips":["Build the timeline in UTC and state the timezone explicitly.","For every stage, name the control that should have stopped it and why it did not."]
+ },
+ "case":{"id":"SOC-2026-00733","severity":"CRITICAL","alert":"Correlated reconstruction of the full Northwind intrusion","host":"Estate","time":"2026-03-02 to 2026-03-05","source":"Complete case file","brief":"Produce the definitive correlated account. Two separate intrusion paths were in play; identify where they converged, establish the true point of first compromise, and name the earliest missed detection opportunity."},
+ "mitre":"Full chain",
+ "evidence":[
+  {"name":"Path A - Perimeter Credential Attack","rows":[
+   "03-02 06:12 Username enumeration against DC-01 from 203.0.113.55 (alert NW-8841, escalated)",
+   "03-04 02:14-02:15 12 failed logons then success for svc_backup from 203.0.113.55 via inbound SMB (FW-LEGACY-11)",
+   "03-04 02:16 SeBackupPrivilege assigned | 02:18 ADMIN$ access",
+   "03-04 02:22 svc_backup2 created, PasswordNeverExpires, added to Domain Admins",
+   "03-04 07:44 SSH password spray against SRV-LNX-04 from 198.51.100.22, deploy compromised",
+   "03-04 07:47 cron persistence + rogue SSH key | 07:50 first C2 resolution from SRV-LNX-04"
+  ]},
+  {"name":"Path B - Phishing Campaign","rows":[
+   "02-24 Domains nw-freight-portal.net, cdn-sync-delivery.net, datasync-77x.net registered (same registrar, same nameservers)",
+   "03-04 08:19-08:24 12 phishing messages delivered; 3 extracted the archive, 2 executed the .lnk",
+   "03-04 08:29 WKS-2041 (k.rahman) compromised, loader installed, Run key persistence, C2 at 08:31",
+   "03-04 08:36 Finance share enumerated from WKS-2041 | 09:12 EDR fingerprinting | 10:05 Domain Admins enumerated",
+   "03-04 09:44 SRV-FILE02 compromised (m.chen mapped drive, second executed .lnk) | 09:46 service persistence",
+   "03-04 22:41-22:45 m.chen cloud account taken over via MFA push bombing"
+  ]},
+  {"name":"Convergence and Consequences","rows":[
+   "03-04 09:43 Privilege escalation to SYSTEM on SRV-FILE02 via BackupMgrSvc binary replacement",
+   "03-04 10:18 svc_backup2 (from Path A) exercises SeDebugPrivilege on SRV-FILE02 (Path B host) - paths converge",
+   "03-04 10:20-11:31 Lateral movement to SRV-HR01, SRV-SQL01, DC-01; blocked at SRV-PCI01",
+   "03-04 11:03 DCSync on DC-01 | 03-04 10:01-22:04 344MB staged | 03-05 exfiltration confirmed",
+   "03-05 13:05 Security log cleared on SRV-FILE02 | stage.exe staged but never executed"
+  ]},
+  {"name":"Control Performance","rows":[
+   "WORKED: SRV-PCI01 segmentation (0xC000015B) | volume shadow copies preserved deleted archives | one user reported the phish at 08:38 | script block logging captured operator activity",
+   "FAILED: FW-LEGACY-11 ownerless inbound SMB rule since 2021 | expired SSH password-auth exception PEX-118 | BackupMgr directory ACL defect since 2021 | DMARC not in enforcement list | no .lnk execution detection | Linux auditd coverage 40%",
+   "MISSED OPPORTUNITY: NW-8841 escalated 03-02 06:12 but no perimeter block applied before 03-04 02:14 - 44 hours"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"What was the true earliest indication of this actor in the estate?","type":"keywords","accept":["03-02","06:12","enumeration","nw-8841","username enumeration","march 2"],"hint":"Look at the first line of Path A - two days before the successful compromise."},
+  {"id":"q2","label":"How many hours elapsed between that first indication and the successful DC-01 compromise?","type":"num","accept":["44"],"hint":"The control performance panel states it explicitly."},
+  {"id":"q3","label":"Which artefact links the phishing domains to the C2 infrastructure?","type":"keywords","accept":["nameserver","registrar","2026-02-24","registration","same date","dyn-fastns"],"hint":"Read the first line of Path B."},
+  {"id":"q4","label":"At what time and on which host did the two intrusion paths converge?","type":"keywords","accept":["10:18","srv-file02","file02"],"hint":"Look for the moment a Path A account acts on a Path B host."},
+  {"id":"q5","label":"Which account made the convergence possible?","type":"exact","accept":["svc_backup2"],"hint":"It was created on Path A and used on the Path B host."},
+  {"id":"q6","label":"Name one control that worked and prevented further damage","type":"keywords","accept":["segment","pci","shadow copy","vss","user report","reported","script block","0xc000015b"],"hint":"The control performance panel lists four."},
+  {"id":"q7","label":"Name the perimeter control failure that enabled the initial DC-01 compromise","type":"keywords","accept":["fw-legacy-11","legacy-11","smb rule","inbound smb","firewall rule"],"hint":"An ownerless 2021 rule appears in the FAILED list."},
+  {"id":"q8","label":"What was the earliest missed detection opportunity?","type":"keywords","accept":["nw-8841","enumeration","03-02","no block","perimeter block","44 hours","not blocked"],"hint":"The escalation happened correctly, but something did not follow it."},
+  {"id":"q9","label":"Did the two paths belong to the same actor? State your evidence.","type":"keywords","accept":["yes","same","infrastructure","asn","91.203.5","nameserver","registration","ja3","user-agent","mutex"],"hint":"Consider shared infrastructure, shared tooling artefacts and the convergence itself."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["remediat","block","rule","review","segment","coverage","report","govern","ownership"],"text":"Report both paths as one actor campaign, remediate the four named control failures, institute ownership and expiry review for firewall rules and policy exceptions, extend segmentation modelled on the PCI environment, and close the loop so escalations always produce a perimeter action."},
+ "timelineKey":["06:12","02:14","07:44","08:29","10:18","11:03"],
+ "hints":["Two intrusion paths ran in parallel for most of 4 March. Find the single event where an artefact from one path is used on a host from the other.","The most important finding is not technical. An alert was correctly escalated on 2 March and nothing was blocked for 44 hours."],
+ "review":"One actor, two parallel paths, converging by design. Path A was a noisy perimeter credential attack that produced a Domain Admin backdoor. Path B was a quiet, targeted phishing campaign using infrastructure registered on 24 February - eight days before the first probe, which shows planning. The paths converged at 10:18 on 4 March when svc_backup2, created via Path A on the domain controller, exercised privileges on SRV-FILE02, a Path B host: from that point the attacker held both a domain-level identity and SYSTEM on a data-rich server, which is what made DCSync and estate-wide movement possible. Shared infrastructure (one /24, one registrar, one set of nameservers), shared tooling artefacts (mutex, user-agent, JA3) and the convergence itself put attribution to one actor beyond reasonable doubt. Four controls worked and belong in the report: PCI segmentation, volume shadow copies, one user reporting the phish, and script block logging. But the defining finding is organisational rather than technical - NW-8841 was correctly escalated on 2 March at 06:12 and no perimeter block was applied for 44 hours, during which the same address walked in through an ownerless 2021 firewall rule.",
+ "next":"The incident is contained and understood. Before you are cleared for the master assessment, demonstrate that you can run the operational side of a SOC: hunting, metrics, tuning and shift discipline."
+},
+{
+ "id":29,"title":"Advanced SOC Operations","domain":"SOC Management","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"Mature SOCs do more than work a queue. Threat hunting tests hypotheses against data where no alert exists. Metrics (time to detect, time to triage, time to contain, false positive rate, detection coverage) show whether the function is improving. Purple teaming validates detections against real technique execution. Shift handover, case documentation and escalation discipline keep it all coherent across people and time.",
+  "why":"Detection engineering fixes what you have already seen. Hunting and validation address what you have not, and metrics tell you honestly whether either is working.",
+  "look":["Hypotheses that are specific, data-backed and falsifiable - not 'look for anything weird'","Metrics that measure outcomes rather than activity; alerts closed per analyst is not a quality measure","Coverage measured against a framework rather than against the vendor's rule count","Handover notes that a stranger could act on"],
+  "fp":["Hunts without a hypothesis generate findings nobody can interpret","A low false positive rate can simply mean the rules are too narrow to fire"],
+  "tips":["Every hunt ends in one of three outcomes: a finding, a new detection, or a documented negative result. All three are valuable.","Measure time to contain, not just time to detect - the gap between them is where damage happens."]
+ },
+ "case":{"id":"SOC-2026-00741","severity":"MEDIUM","alert":"Post-incident SOC capability review and hunt planning","host":"N/A - operations","time":"2026-03-09","source":"SOC management","brief":"Assess the SOC's performance on this incident using the metrics provided, select the hunt hypotheses worth running, and identify the operational failure that had the greatest impact."},
+ "mitre":"N/A - operations",
+ "evidence":[
+  {"name":"Incident Metrics","rows":[
+   "First malicious activity: 2026-03-02 06:12 | First alert raised: 2026-03-02 06:12 (same minute - detection worked)",
+   "Alert triaged and escalated: 2026-03-02 07:15 (63 min) | Perimeter action taken: 2026-03-04 02:14+ (none before compromise)",
+   "Successful compromise: 2026-03-04 02:15 | Detected as compromise: 2026-03-04 08:05 (5h50m)",
+   "Full scope established: 2026-03-04 13:00 | Containment executed: 2026-03-05 15:30",
+   "Mean time to triage (30-day): 47 min | Mean time to contain (30-day): 19 h | Alert FP rate (30-day): 62%",
+   "Detection coverage vs ATT&CK techniques observed in this incident: 9 of 21 techniques had a detection that fired"
+  ]},
+  {"name":"Candidate Hunt Hypotheses","rows":[
+   "H1 'Other hosts may hold the NWSYNC mutex or beacon with the NorthSync user-agent' - data: EDR + proxy, both collected",
+   "H2 'Other services in the estate have user-writable program directories exploitable as BackupMgrSvc was' - data: endpoint config scan, available",
+   "H3 'Look for anything suspicious on the network' - data: n/a",
+   "H4 'Other externally reachable management ports exist that are not covered by a firewall rule review' - data: perimeter config + external scan, available",
+   "H5 'Other cloud accounts have attacker-registered MFA methods added in the last 30 days' - data: identity audit logs, collected",
+   "H6 'The attacker used a zero-day that we cannot detect' - data: none, unfalsifiable"
+  ]},
+  {"name":"Operational Findings","rows":[
+   "F1 Escalation NW-8841 was correctly raised and correctly escalated, but no owner was assigned to take perimeter action - 44h gap",
+   "F2 62% FP rate means analysts spend the majority of shift time on noise",
+   "F3 Linux telemetry coverage 40%; the intrusion's second foothold was on Linux",
+   "F4 No purple team exercise has validated detections against T1110, T1021.002 or T1003.006 in 18 months",
+   "F5 Shift handover notes for 2026-03-02 did not mention NW-8841 at all"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"How long from successful compromise to detection as a compromise (in hours and minutes)?","type":"keywords","accept":["5h50","5:50","5 h 50","5 hours 50","350"],"hint":"Compare the compromise timestamp with the detection timestamp in the metrics panel."},
+  {"id":"q2","label":"Which hunt hypotheses should be rejected as unusable?","type":"keywords","accept":["h3","h6","h3 and h6","h3,h6"],"hint":"One is too vague to test and one cannot be falsified with any available data."},
+  {"id":"q3","label":"Which hypothesis directly tests whether the compromise spread beyond the known scope?","type":"exact","accept":["h1"],"hint":"It searches for the durable behavioural indicators across the estate."},
+  {"id":"q4","label":"Which hypothesis addresses a systemic weakness rather than this specific actor?","type":"keywords","accept":["h2","h4","h2 and h4","h2,h4"],"hint":"Two hypotheses look for the class of misconfiguration rather than the attacker's artefacts."},
+  {"id":"q5","label":"What fraction of observed techniques had a detection that fired?","type":"keywords","accept":["9 of 21","9/21","43%","43","9 out of 21"],"hint":"Read the coverage line in the metrics panel."},
+  {"id":"q6","label":"Which operational finding had the single greatest impact on this incident?","type":"exact","accept":["f1"],"hint":"Detection worked in the same minute; something else did not happen for 44 hours."},
+  {"id":"q7","label":"Why is a 62% false positive rate an operational risk, not just an annoyance?","type":"keywords","accept":["fatigue","miss","time","capacity","attention","desensit","burn","real alert","distract"],"hint":"Consider what happens to the analyst's attention and available hours."},
+  {"id":"q8","label":"What process change would most directly have prevented the 44-hour gap?","type":"keywords","accept":["owner","ownership","assign","sla","follow-up","track","handover","accountab","closure"],"hint":"The escalation was raised correctly and then nobody owned the resulting action."},
+  {"id":"q9","label":"Which finding would a purple team exercise directly address?","type":"exact","accept":["f4"],"hint":"One finding names techniques that have never been validated."}
+ ],
+ "decision":"needs_escalation","severity_answer":"HIGH",
+ "recommend":{"any":["ownership","sla","hunt","purple","coverage","tune","handover","metric","govern"],"text":"Institute mandatory ownership and an action SLA for every escalation, run H1, H2, H4 and H5, commission purple team validation of the three untested techniques, drive the FP rate down through the tuning backlog, and close the Linux telemetry gap."},
+ "timelineKey":[],
+ "hints":["Read the metrics as a story about where time went. Detection was instant; something between detection and action consumed two days.","A usable hunt hypothesis names the data source it will be tested against and can come back negative. Two of these cannot."],
+ "review":"Detection performed well - the alert fired in the same minute as the first malicious activity, and triage and escalation were correct within 63 minutes. Everything after that is the problem. No owner was assigned to the resulting perimeter action, so the same address walked in 44 hours later through a rule nobody owned either; F1 is the highest-impact finding in the entire incident and it is a process failure, not a technology one. It is compounded by F5: the handover notes never mentioned NW-8841, so the next shift had no reason to chase it. A 62 percent false positive rate means analysts spend most of their shift on noise, which is precisely the condition under which a two-day-old escalation gets forgotten. Coverage of 9 of 21 observed techniques, an 18-month gap in purple team validation of the three techniques most central to this intrusion, and 40 percent Linux telemetry complete the picture. H1 and H5 hunt this actor; H2 and H4 hunt the class of weakness that let them in, which is the more durable investment. H3 is untestable and H6 is unfalsifiable.",
+ "next":"You are cleared for the master assessment. A new, unrelated intrusion is unfolding at Northwind and you will run it end to end, alone, from first alert to final incident report."
+}
+]

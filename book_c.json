@@ -1,0 +1,161 @@
+[
+ {
+  "id": 21,
+  "title": "IOC Analysis",
+  "part": "Analysis",
+  "summary": "Extracting, validating and using indicators without drowning in them.",
+  "sections": [
+   {"h": "What an indicator is", "p": "An artefact observed on a network or host that, with context, suggests compromise: an address, a domain, a hash, a filename, a registry path, a mutex, a certificate thumbprint, a user-agent string. An indicator without context is a string; an indicator with context is evidence."},
+   {"h": "The pyramid of pain", "p": "Hashes are trivial for an adversary to change, addresses and domains slightly less so, host and network artefacts harder, tools harder again, and tactics hardest of all. Detections built at the top of the pyramid survive one recompile. Detections built on behaviour survive the campaign."},
+   {"h": "Extraction discipline", "p": "Pull indicators from primary evidence only - the raw log line, the EDR process record, the mail header - and record where each came from. An indicator copied from a colleague's note without a source cannot be defended in a report."},
+   {"h": "Validation before blocking", "p": "Check whether the address belongs to a CDN, a cloud provider or your own egress NAT before you block it. Blocking a shared hosting address can take out a business service and teach the organisation not to trust the SOC."},
+   {"h": "Pivoting", "p": "One confirmed indicator is a starting point, not an answer. Pivot: which other hosts resolved that domain, which other processes wrote that hash, which other accounts authenticated from that address. Blast radius is found by pivoting, not by staring."},
+   {"h": "Ageing and expiry", "p": "Indicators decay. A command-and-control address may be reassigned to an unrelated tenant within weeks. Every block and every watchlist entry needs a review date, otherwise the list becomes an unmaintainable source of false positives."},
+   {"h": "Common mistakes", "p": "Blocking indicators before understanding scope, which tips the adversary off; treating any hit on a large indicator feed as an incident; and building a report out of indicators alone, with no narrative of what actually happened."},
+   {"h": "Practical example", "p": "A beaconing host yields a domain. Passive DNS shows the domain resolved to an address that three other internal hosts also contacted. Those three hosts were not alerting. The pivot - not the original alert - defined the incident."}
+  ]
+ },
+ {
+  "id": 22,
+  "title": "MITRE ATT&CK",
+  "part": "Analysis",
+  "summary": "A shared vocabulary for adversary behaviour, and how to use it honestly.",
+  "sections": [
+   {"h": "Structure", "p": "Tactics are the adversary's goals - initial access, execution, persistence, privilege escalation, defence evasion, credential access, discovery, lateral movement, collection, command and control, exfiltration, impact. Techniques are the ways each goal is met, and sub-techniques are the specific variants."},
+   {"h": "Why it matters to a SOC", "p": "It gives analysts, detection engineers, red teams and management one vocabulary. 'Suspicious PowerShell' means different things to different people; T1059.001 does not. It also makes coverage measurable: which techniques can we detect, which can we only detect after the fact, and which are blind."},
+   {"h": "Mapping an incident", "p": "Map observed behaviour, not assumed behaviour. Every technique in your map should point at a specific piece of evidence. If you cannot name the log line, the technique does not belong in the report."},
+   {"h": "Common confusions", "p": "Valid Accounts (T1078) is used at several stages and analysts often record it once and move on. Remote Services (T1021) is lateral movement, not execution. Scheduled Task (T1053) can be persistence, execution or privilege escalation depending on context."},
+   {"h": "Coverage work", "p": "Building a coverage heatmap is useful only when honest. Mark a technique as covered when a detection exists, has fired on a true positive or a purple-team test, and is tuned. Marking it covered because a log source theoretically contains the data is self-deception."},
+   {"h": "Common mistakes", "p": "Decorating a report with technique IDs to look sophisticated, mapping to the most exotic technique rather than the plain one, and treating the matrix as a checklist an adversary must follow in order."},
+   {"h": "Practical example", "p": "An intrusion maps to T1566.002 for the phishing link, T1078 for the stolen credentials, T1059.001 for the loader, T1053.005 for persistence, T1558.003 for kerberoasting, T1021.002 for lateral movement, T1071.001 for command and control and T1567 for exfiltration - and each of those IDs has a log reference beside it."}
+  ]
+ },
+ {
+  "id": 23,
+  "title": "Incident Response",
+  "part": "Response",
+  "summary": "What happens when triage becomes an incident, and the analyst's place in it.",
+  "sections": [
+   {"h": "The lifecycle", "p": "Preparation, detection and analysis, containment, eradication, recovery, and lessons learned. The phases overlap in practice, but skipping one always costs more later - particularly preparation and lessons learned, which are the two most often abandoned."},
+   {"h": "Declaring an incident", "p": "Declaration is a decision with consequences: it calls people in, starts a clock and may trigger legal and regulatory obligations. Declare on defined criteria, not on mood. Every hour of hesitation is an hour of adversary dwell time."},
+   {"h": "Containment sequencing", "p": "Contain in an order that does not destroy evidence or tip the adversary prematurely. Capture volatile memory before isolating where feasible. Isolate rather than power off. Reset credentials only when you can reset all of the compromised ones at once - a partial reset just tells the adversary you are watching."},
+   {"h": "Eradication and recovery", "p": "Eradication removes access: implants, persistence, credentials, rogue accounts, malicious rules. Recovery restores service with monitoring in place and explicit acceptance criteria. Restoring a host without removing persistence is a very expensive way to do nothing."},
+   {"h": "Roles", "p": "An incident commander decides and owns the timeline. Analysts investigate. A scribe records. Communications handles internal and external messaging. Legal advises on obligation. When an analyst is simultaneously investigating and briefing executives, both jobs are done badly."},
+   {"h": "Evidence and records", "p": "Timestamps in UTC, an unbroken chain of custody for images and exports, and decisions logged with their rationale. A response that cannot be reconstructed afterwards cannot be defended to a regulator, an insurer or a court."},
+   {"h": "Common mistakes", "p": "Rebuilding the first infected host immediately, resetting one account of many, communicating over infrastructure the adversary controls, and closing the incident before persistence has been searched for across the estate."},
+   {"h": "Practical example", "p": "A confirmed intrusion on a file server: isolate at the switch, preserve memory and disk, reset every account seen authenticating from the adversary's infrastructure in one coordinated action, remove the scheduled task and service, restore from a known-good backup predating first access, and monitor the restored host at elevated sensitivity for two weeks."}
+  ]
+ },
+ {
+  "id": 24,
+  "title": "Digital Forensics Investigation",
+  "part": "Response",
+  "summary": "Recovering what happened from artefacts that were never meant to be a record.",
+  "sections": [
+   {"h": "Order of volatility", "p": "Collect from most volatile to least: memory and running state, network connections, temporary filesystem data, disk, then backups and archived logs. Every minute a compromised host stays running, memory evidence degrades - and every minute it stays running, the adversary may still be working."},
+   {"h": "Windows execution artefacts", "p": "Prefetch records that a binary ran and roughly when. ShimCache and AmCache record presence and path. UserAssist records interactive launches. Jump lists and shellbags record user navigation. Each is partial; together they build a defensible picture."},
+   {"h": "Filesystem timestamps", "p": "NTFS keeps two sets of timestamps - the standard information attribute, writable through the API, and the filename attribute in the master file table, which is not. When the two disagree, timestomping is the explanation, and the filename attribute usually preserves the real creation time."},
+   {"h": "Log clearing", "p": "Security event 1102 records the clearing of the security log and cannot itself be suppressed by the clearing. Clearing does not remove forwarded copies in the SIEM, nor the file-system and registry traces of the tool that did it. Clearing is an indicator, not an erasure."},
+   {"h": "Memory", "p": "Memory carries what disk does not: injected code with no file on disk, decrypted configuration, command history, credentials in process memory and network connections already closed. If a host is suspected of in-memory tooling, capture memory first or lose the case."},
+   {"h": "Integrity", "p": "Hash on acquisition, hash again after transfer, work only on copies, and record who held the evidence and when. Forensics without integrity controls produces interesting conclusions that cannot be used."},
+   {"h": "Common mistakes", "p": "Browsing the live host with an administrator account and overwriting artefacts, trusting a single timestamp source, and rebooting to 'see if it comes back'."},
+   {"h": "Practical example", "p": "Prefetch shows a binary executed at 02:41. Its standard-information creation time claims a date three years earlier, but the master file table filename attribute shows the same day it ran. The stated age was a defence-evasion attempt, and the real execution window is now established."}
+  ]
+ },
+ {
+  "id": 25,
+  "title": "Detection Engineering",
+  "part": "Engineering",
+  "summary": "Turning one investigation into a control that catches the next one.",
+  "sections": [
+   {"h": "Purpose", "p": "Every true positive should leave behind either a new detection or an improvement to an existing one. A SOC that investigates well but never engineers detections re-learns the same lesson at the same cost every quarter."},
+   {"h": "What makes a good rule", "p": "It targets behaviour rather than a replaceable artefact, it has a precise scope, it is documented with its intent and its expected false positives, and it is tested against historical data before it goes live."},
+   {"h": "Backtesting", "p": "Run the candidate logic over thirty to ninety days of historical data. Count the hits and inspect a sample. A rule that would have fired eleven thousand times is not a detection, it is a denial-of-service attack on your own analysts."},
+   {"h": "Precision versus recall", "p": "High recall catches everything and buries the team. High precision catches little and misses campaigns. Aim for detections whose true-positive rate justifies the analyst minutes they consume, and accept that a small number of low-precision, high-value rules on Tier-0 assets are worth the pain."},
+   {"h": "Rule lifecycle", "p": "Draft, backtest, tune, deploy in monitor-only, review, promote to alerting, then review on a schedule. Rules that no longer fire, or fire only on noise, are retired deliberately - not left to rot with their alerts silently routed to a folder nobody opens."},
+   {"h": "Alert content", "p": "The alert should carry what the analyst needs to start: host, user, process ancestry, source and destination, the matched field, the rule's intent and a link to the runbook. An alert that requires five pivots before triage can begin wastes the minutes that matter."},
+   {"h": "Common mistakes", "p": "Writing rules from a blog post without backtesting, hardcoding indicators that expire in a week, alerting on parent-child relationships that the estate produces legitimately thousands of times a day, and never measuring whether a rule has ever produced a true positive."},
+   {"h": "Practical example", "p": "An investigation found an encoded PowerShell command spawned by a document process. A hash rule would age out instantly. The deployed rule instead alerts on an office application spawning a scripting engine with encoded arguments - behaviour the adversary must change tooling to avoid."}
+  ]
+ },
+ {
+  "id": 26,
+  "title": "Writing SOC Reports",
+  "part": "Engineering",
+  "summary": "The written output is the only part of the work most people ever see.",
+  "sections": [
+   {"h": "Audience", "p": "One document usually has three audiences: executives who need impact and status, engineers who need specifics to act on, and the future analyst reading this during the next incident. Write the executive summary for the first, the body for the second, and keep the evidence references complete for the third."},
+   {"h": "Structure that works", "p": "Executive summary, initial detection, timeline, indicators, affected users and hosts, techniques and their mapping, evidence, root cause, impact, containment, eradication, recovery, detection improvements, and a conclusion that states confidence."},
+   {"h": "Writing the timeline", "p": "UTC everywhere, one line per event, each line tied to a source. Include the detection time and the actual first-activity time; the gap between them is often the most important number in the report."},
+   {"h": "Facts, inference, and speculation", "p": "Mark them apart. 'The account authenticated from 203.0.113.55 at 02:14 (source: security log 4624)' is a fact. 'The credentials were most likely obtained in the earlier phishing campaign' is an inference and must be labelled as one."},
+   {"h": "Root cause", "p": "Root cause is the control failure that allowed entry, not the last thing that went wrong. 'The user clicked a link' is rarely the root cause; 'remote access was reachable from the internet with single-factor authentication for a subset of accounts' usually is."},
+   {"h": "Tone", "p": "Neutral and specific. No blame on individuals, no dramatics, no hedging so heavy the reader cannot tell what you concluded. State the conclusion, state the confidence, state what would change it."},
+   {"h": "Common mistakes", "p": "Pasting raw logs instead of summarising them, omitting what was not determined, writing recommendations nobody owns, and producing a report so long the executive summary is the only part read - while being the part written last and worst."},
+   {"h": "Practical example", "p": "A three-page report: half a page of executive summary with impact and status, a one-page timeline, half a page of indicators and affected assets, and a page of root cause, response actions and detection improvements with named owners and dates."}
+  ]
+ },
+ {
+  "id": 27,
+  "title": "False Positives",
+  "part": "Engineering",
+  "summary": "Most of the queue is not an attack, and knowing why is a core skill.",
+  "sections": [
+   {"h": "Why they dominate", "p": "Detections are built to be sensitive, and enterprise environments do strange things legitimately. Administrators use the same remote-execution tooling as adversaries, backup software reads everything, and deployment systems push binaries to thousands of hosts at three in the morning."},
+   {"h": "Classic sources", "p": "Vulnerability scanners tripping every network rule; software deployment causing mass identical process creation; service accounts with stale passwords generating lockouts; disaster-recovery replication producing large scheduled outbound transfers; and support staff legitimately using debugging tools that touch process memory."},
+   {"h": "How to prove it", "p": "A false positive is proved, not assumed. Find the change record, the schedule, the owner's confirmation, the documented business process. 'It looks like a scanner' is not a closure; 'this matches CHG-4471, approved, same source, same window' is."},
+   {"h": "The dangerous middle", "p": "Adversaries deliberately hide in benign-looking activity: running during patch windows, using the deployment tool's own account, naming implants after legitimate services. Confirm the specifics - exact host, exact account, exact time window - rather than matching the shape of the activity."},
+   {"h": "Tuning versus suppressing", "p": "Tuning narrows a rule with a documented reason and a review date. Suppressing hides output. Suppression rules with no owner and no expiry are where intrusions are eventually found to have been visible all along."},
+   {"h": "Measuring", "p": "Track false-positive rate per rule. The worst handful of rules usually produce most of the noise, and fixing them returns more analyst time than any other single intervention."},
+   {"h": "Common mistakes", "p": "Closing by pattern-matching to a previous closure, accepting a verbal 'that's normal' without a record, and tuning out an entire host class because one host was noisy."},
+   {"h": "Practical example", "p": "A large outbound transfer alerts at 02:00. The destination belongs to the contracted disaster-recovery provider, the volume matches the nightly baseline, and a standing change covers it. Closed as a false positive - with the evidence recorded, because the same alert on a different destination next week must not inherit that closure."}
+  ]
+ },
+ {
+  "id": 28,
+  "title": "Real SOC Workflow",
+  "part": "Operations",
+  "summary": "How the day actually runs, from handover to handover.",
+  "sections": [
+   {"h": "Shift structure", "p": "Handover, queue review, triage, investigations, escalations, tuning and documentation, then handover again. Handover is the highest-risk moment of the day: partially worked investigations are where context is lost."},
+   {"h": "Working the queue", "p": "Rank by risk - asset criticality combined with detection severity and confidence - not by arrival order. Take ownership before investigating so two analysts do not duplicate work, and record the status so the queue tells the truth."},
+   {"h": "Tiers in practice", "p": "Tier 1 triages and either closes with evidence or escalates with context. Tier 2 investigates deeply and drives containment. Tier 3 hunts, does forensics and engineering. The boundaries move between organisations; what does not move is the requirement that an escalation carries the work already done."},
+   {"h": "Escalating well", "p": "A good escalation states what fired, what you checked, what you found, what you could not determine, and what you recommend. A bad escalation forwards the alert. The first buys the senior analyst twenty minutes; the second costs them twenty."},
+   {"h": "Metrics that matter", "p": "Time to detect, time to triage, time to contain, dwell time, escalation accuracy and false-positive rate per rule. Metrics that count closed alerts per analyst reward speed over correctness and will eventually close a real intrusion."},
+   {"h": "Runbooks", "p": "A runbook says what the alert means, what to check, what proves benign, what proves malicious, and when to escalate. Runbooks written after an incident, while the detail is fresh, are the ones that are actually used."},
+   {"h": "Common mistakes", "p": "Working the queue top-down, leaving investigations unowned, never writing the note because the shift is busy, and treating the SIEM as the only tool when the answer is in the EDR."},
+   {"h": "Practical example", "p": "An analyst takes a domain-controller alert at handover, claims it, confirms the source is external and outside all change windows, writes four lines of findings, escalates to Tier 2 within the runbook's fifteen-minute window, and records the two queue items they closed as noise with their change references."}
+  ]
+ },
+ {
+  "id": 29,
+  "title": "Career Preparation",
+  "part": "Operations",
+  "summary": "Getting into a SOC, and being worth keeping once you are there.",
+  "sections": [
+   {"h": "What is actually assessed", "p": "Interviews test reasoning under uncertainty far more than recall. Expect to be handed a log extract and asked what you see, what you would check next, and what would change your mind. Structured thinking beats memorised definitions every time."},
+   {"h": "Foundations to build first", "p": "Networking to the level of reading a flow record, Windows authentication and event logs, Linux logs and process model, Active Directory basics, scripting enough to parse and correlate, and the ability to write clearly. Tools are learned in weeks; these are not."},
+   {"h": "A home lab", "p": "A domain controller, a workstation, a Linux host, a log shipper and a free SIEM is enough to generate and investigate real telemetry. Detonating safe samples in an isolated lab and then hunting yourself teaches more than any number of walkthroughs."},
+   {"h": "Certifications", "p": "They open doors and structure study; they do not substitute for the ability to work a case. Blue-team practical certifications that require an investigation and a report are the ones that map closest to the job."},
+   {"h": "Portfolio", "p": "Write up investigations - lab or public data - in the report structure this book describes. A well-written incident report is more persuasive evidence of competence than a list of course names."},
+   {"h": "The first ninety days", "p": "Learn the environment before the tools: what is normal here, which hosts are critical, who owns what, which alerts are known noise and why. The analyst who knows the estate is the one whose judgement is trusted."},
+   {"h": "Common mistakes", "p": "Chasing tool names rather than fundamentals, avoiding writing, treating Tier 1 as a queue to escape rather than a craft, and burning out by taking every shift's worst alert personally."},
+   {"h": "Practical example", "p": "A candidate is shown fifteen authentication events and asked to comment. A weak answer names brute force immediately. A strong answer notes the account type, the source, the time relative to business hours, the success that followed the failures, and states what they would pull next - and why it might still be a stale service credential."}
+  ]
+ },
+ {
+  "id": 30,
+  "title": "Advanced SOC Analyst Mindset",
+  "part": "Operations",
+  "summary": "How senior analysts think, and how everything in this book connects.",
+  "sections": [
+   {"h": "Hypothesis before evidence", "p": "Strong analysts state what they expect to see if a theory is true, then look. Weak analysts scroll until something catches the eye. The first method finds absence of evidence, which is itself informative; the second finds only what is visually striking."},
+   {"h": "Disproving yourself", "p": "Actively search for the evidence that would kill your conclusion. If a large transfer looks like exfiltration, look hard for the backup schedule. Confirmation bias is the single most expensive analytical failure in a SOC, and it produces confident, wrong reports."},
+   {"h": "Baseline is everything", "p": "Nothing is suspicious in isolation. Encoded PowerShell is normal in one estate and an incident in another. The analyst who knows what normal looks like on this network at this hour outperforms the analyst with better tools and no context."},
+   {"h": "Thinking in chains", "p": "Adversaries do not perform single actions. Access, execution, persistence, credentials, discovery, movement, collection, command and control, exfiltration, impact. When you find one link, the professional instinct is to ask what came before and what came after - not to close the one alert."},
+   {"h": "Absence as evidence", "p": "A missing log, a cleared event, a gap in beacon traffic, a host that stopped reporting - these are findings. Treat silence in telemetry as something to be explained rather than something to be scrolled past."},
+   {"h": "Calibrated confidence", "p": "Say low, moderate or high confidence, and say what would change it. Analysts who only ever speak in certainties lose credibility the first time they are wrong; analysts who never conclude anything are never asked again."},
+   {"h": "Speed with rigour", "p": "Containment is a race, but a wrong containment causes an outage and destroys evidence. Senior judgement is knowing which decisions are reversible and can be made fast, and which are not and must be made carefully."},
+   {"h": "How this book connects", "p": "Platforms give you the telemetry. Attack technique chapters tell you what to look for in it. Analysis chapters turn observations into assessments. Response chapters turn assessments into action. Engineering chapters turn action into controls, so the next intrusion is caught earlier. The loop - detect, investigate, respond, improve - is the whole job, and a SOC that runs it honestly gets measurably harder to breach every quarter."}
+  ]
+ }
+]

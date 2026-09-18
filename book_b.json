@@ -1,0 +1,96 @@
+[
+{"id":11,"title":"Active Directory","part":"Platforms","summary":"Why the directory is the centre of most enterprise intrusions.","sections":[
+{"h":"What AD is","p":"The identity and authorisation database of a Windows estate: users, computers, groups, policies and trusts. Control of the directory is effectively control of everything that authenticates against it."},
+{"h":"Tiering","p":"A tiered model separates Tier 0 (domain controllers, identity infrastructure), Tier 1 (servers and applications) and Tier 2 (workstations), and forbids credentials from a higher tier being used on a lower one. Tier violations are how a workstation compromise becomes a domain compromise."},
+{"h":"High-value objects","p":"Domain Admins, Enterprise Admins, Backup Operators, Account Operators, the krbtgt account, GPOs linked to many objects, and any service account with an SPN and an old password."},
+{"h":"Attack surface","p":"Kerberoasting (service tickets for offline cracking), AS-REP roasting (accounts without pre-authentication), DCSync (replication rights abused to pull hashes), golden and silver tickets (forged Kerberos tickets), GPO abuse to run code estate-wide, and ACL abuse to grant rights quietly."},
+{"h":"What to monitor","p":"Group membership changes on privileged groups, account creation outside change control, 4769 bursts with RC4 encryption, DS-Replication-Get-Changes-All by non-DC accounts, and GPO modifications."},
+{"h":"After a domain compromise","p":"If DCSync or a DC compromise is confirmed, every credential in the domain is suspect. krbtgt must be reset twice with a replication cycle between resets, and recovery planning should assume a rebuild of trust rather than a cleanup."}
+]},
+{"id":12,"title":"Authentication Attacks","part":"Attack Techniques","summary":"Brute force, spraying, stuffing, and abuse of valid credentials.","sections":[
+{"h":"What it is","p":"Attacks that obtain or abuse credentials to authenticate as a legitimate identity, rather than exploiting a software vulnerability."},
+{"h":"Why attackers use it","p":"Valid credentials generate no exploit artefacts, survive patching, and grant exactly the access the legitimate user has. It is the cheapest and most reliable route into most enterprises."},
+{"h":"Variants","p":"Brute force (many passwords, one account), password spraying (one common password, many accounts, staying under lockout thresholds), credential stuffing (username/password pairs stolen elsewhere), and use of credentials bought from infostealer marketplaces."},
+{"h":"What it looks like in logs","p":"Windows: 4625 bursts, then a 4624 from the same source. The sub-status separates password guessing from username enumeration. Linux: repeated 'Failed password' then 'Accepted password'. Cloud: sign-ins from unfamiliar ASNs, impossible travel, repeated MFA prompts."},
+{"h":"How to investigate","p":"Identify the source address and account, count the failures precisely, find the first and last suspicious events, determine whether authentication succeeded, then examine everything the account did afterwards - which is where the intrusion actually begins."},
+{"h":"Containment","p":"Block the source, reset the credential, revoke sessions and tokens (a reset alone leaves an active session working), remove any attacker-registered MFA method, and check for accounts created or promoted while the credential was live."},
+{"h":"MITRE","p":"T1110 Brute Force, T1110.003 Password Spraying, T1078 Valid Accounts, T1621 MFA Request Generation."},
+{"h":"Common mistakes","p":"Resetting the password but not revoking sessions; missing the backdoor account created during the window; treating an internal user's two failed attempts as an attack."}
+]},
+{"id":13,"title":"Phishing","part":"Attack Techniques","summary":"Email as the dominant initial access vector.","sections":[
+{"h":"What it is","p":"Messages crafted to make a recipient execute a file, click a credential-harvesting link, or perform an action such as changing payment details."},
+{"h":"Why attackers use it","p":"It scales, requires no vulnerability, and targets the one component that cannot be patched. Targeted variants impersonate real partners and reference real business processes."},
+{"h":"What it looks like","p":"Look-alike sender domains, authentication failures (SPF, DKIM, DMARC), Received hops through unrelated infrastructure, urgency and deadlines in the body, and attachments that execute: .lnk, .iso, .img, .html, macro-enabled documents, and password-protected archives whose password is in the message."},
+{"h":"Why encrypted archives matter","p":"A gateway cannot inspect an encrypted archive. Supplying the password in the body defeats content scanning while remaining trivially usable by the victim. Treat that combination as hostile until proven otherwise."},
+{"h":"How to investigate","p":"Analyse headers first, then the payload, then scope: how many recipients, how many opened, how many extracted, how many executed. The execution count defines the incident; the delivery count defines the campaign."},
+{"h":"Containment","p":"Purge from all mailboxes, block the sender domain and its supporting infrastructure, isolate endpoints where execution occurred, reset affected credentials, and issue targeted awareness that names the specific lure."},
+{"h":"MITRE","p":"T1566.001 Spearphishing Attachment, T1566.002 Spearphishing Link, T1204.002 User Execution."},
+{"h":"Common mistakes","p":"Treating the reporting user as the problem. Users who report are the control that worked; reinforce it publicly."}
+]},
+{"id":14,"title":"Malware","part":"Attack Techniques","summary":"Loaders, implants and how to triage a sample from a report.","sections":[
+{"h":"Categories","p":"Loaders and droppers (establish a foothold and fetch more), remote access implants, infostealers, ransomware encryptors, and living-off-the-land tooling that uses legitimate signed binaries instead of custom code."},
+{"h":"Static triage","p":"Hashes for identification, imports for capability, strings for infrastructure and behaviour, entropy and section names for packing, compile timestamp and signature for provenance."},
+{"h":"Dynamic triage","p":"Sandbox execution recording process, file, registry and network behaviour: mutexes created, persistence written, domains resolved, beacon intervals, injection targets."},
+{"h":"Capability from imports","p":"VirtualAllocEx with WriteProcessMemory and CreateRemoteThread indicates process injection. CryptEncrypt suggests ransomware. InternetOpenUrl indicates download capability. Capability inferred from imports is more reliable than a family name."},
+{"h":"Indicator durability","p":"File hashes change with every rebuild and are the weakest indicator. Mutex names, URI paths, user-agents, registry value names and behavioural sequences are baked into the tooling and survive recompilation."},
+{"h":"What to do with the report","p":"Convert every artefact into a hunt query and a detection candidate, then sweep the estate. A triage report that produces no detections has produced nothing."},
+{"h":"MITRE","p":"T1027 Obfuscated Files, T1055 Process Injection, T1204 User Execution, T1105 Ingress Tool Transfer."}
+]},
+{"id":15,"title":"Persistence","part":"Attack Techniques","summary":"How attackers guarantee they can come back.","sections":[
+{"h":"What it is","p":"Any mechanism that returns execution to the attacker after a reboot, a logoff or a cleanup attempt."},
+{"h":"Why attackers use it","p":"Access obtained is access that can be lost. Persistence protects the investment, and experienced operators plant several mechanisms of different types expecting the obvious one to be found."},
+{"h":"Windows mechanisms","p":"Run and RunOnce registry values, scheduled tasks, services (7045), WMI event filter and consumer pairs, startup folder shortcuts, DLL search-order hijacking, image file execution options, and accounts added to privileged groups."},
+{"h":"Linux mechanisms","p":"cron entries and systemd timers, systemd units, rc scripts, shell profile modifications, SUID binaries, and additional SSH authorized_keys entries."},
+{"h":"How to hunt it","p":"Enumerate by creation time rather than by suspicion. Everything created during the confirmed attack window deserves inspection. Check WMI subscriptions explicitly - they do not appear in ordinary startup locations."},
+{"h":"Containment","p":"Remove every mechanism in one coordinated action across all hosts, preserve copies first, then verify with a second sweep. Cleaning one host while others still beacon simply invites redeployment."},
+{"h":"MITRE","p":"T1547.001 Registry Run Keys, T1053.005 Scheduled Task, T1543.003 Windows Service, T1546.003 WMI Event Subscription, T1098.004 SSH Authorized Keys."},
+{"h":"Common mistakes","p":"Finding one mechanism and stopping. Deleting rather than preserving. Missing a scheduled task that re-downloads the payload after the payload itself is removed."}
+]},
+{"id":16,"title":"Privilege Escalation","part":"Attack Techniques","summary":"Moving from the rights you have to the rights you want.","sections":[
+{"h":"What it is","p":"Obtaining higher privileges on a host or in the directory than the compromised identity originally held."},
+{"h":"Why attackers use it","p":"Before escalation, damage is bounded by one user's access. After it, the attacker can read memory, install services, disable defences and move laterally with stolen credentials."},
+{"h":"Windows routes","p":"Weak service or directory permissions allowing binary replacement, unquoted service paths, credential theft from LSASS, token impersonation, vulnerable drivers, and simply adding an account to a privileged group when directory write access exists."},
+{"h":"Linux routes","p":"sudo misconfiguration, SUID binaries, writable systemd units or cron files, and kernel exploits."},
+{"h":"What it looks like","p":"A process whose integrity level rises without a corresponding UAC prompt, service binaries or configurations modified by non-admin accounts, 4672 for accounts that should never receive special privileges, and group membership changes outside change control."},
+{"h":"How to investigate","p":"Compare integrity or privilege state before and after on the same code, identify the specific misconfiguration exploited, and establish what the escalated context then did - usually credential access."},
+{"h":"Containment","p":"Restore the original binary and correct permissions, treat every credential cached on the host as stolen, and audit privileged group membership across the estate."},
+{"h":"MITRE","p":"T1068 Exploitation for Privilege Escalation, T1574.011 Services Registry Permissions Weakness, T1134 Access Token Manipulation, T1078 Valid Accounts."}
+]},
+{"id":17,"title":"Lateral Movement","part":"Attack Techniques","summary":"Authenticated movement between hosts using stolen credentials.","sections":[
+{"h":"What it is","p":"Using credentials obtained on one host to access another, repeated until the attacker reaches the systems they actually want."},
+{"h":"Why attackers use it","p":"Initial access rarely lands on the valuable system. Movement converts a foothold into reach - and because it uses valid credentials, it looks like administration."},
+{"h":"Common methods","p":"Remote service creation (PsExec: 4648, Type 3 logon, ADMIN$ access, 7045 PSEXESVC), WMI remote execution, WinRM, RDP (Type 10), remote scheduled tasks, and pass-the-hash producing NTLM network logons."},
+{"h":"The four-event shape","p":"Most SMB-based movement produces the same sequence: explicit credentials supplied, a network logon on the destination, administrative share access, and a new service. Recognising that shape lets you count movements quickly."},
+{"h":"How to investigate","p":"Build a movement graph: source host, destination host, account, method, timestamp. Count distinct destinations per account per hour - humans, scripts and management tooling have very different shapes."},
+{"h":"What blocking looks like","p":"A destination returning 0xC000015B is refusing the logon type, typically because segmentation or a tiered admin model denies network logon to that account. That is a control working, and it belongs in the report."},
+{"h":"Containment","p":"Disable the account used for movement, isolate affected hosts simultaneously, and assume credentials cached on every visited host are compromised."},
+{"h":"MITRE","p":"T1021.002 SMB/Windows Admin Shares, T1021.001 Remote Desktop, T1569.002 Service Execution, T1047 WMI."}
+]},
+{"id":18,"title":"Command & Control","part":"Attack Techniques","summary":"The channel between implant and operator.","sections":[
+{"h":"What it is","p":"The communication path an implant uses to receive instructions and return results."},
+{"h":"Why it matters","p":"C2 is the one stage an attacker cannot skip on a persistent intrusion. Mapping every channel is what makes containment effective; blocking one address rarely ends anything."},
+{"h":"Transports","p":"HTTP and HTTPS to attacker infrastructure or through a redirector, DNS (queries and TXT answers), legitimate cloud and collaboration services used as dead drops, SMB named pipes for internal pivots, and occasionally ICMP or other protocols."},
+{"h":"Timing","p":"Fixed intervals with jitter are standard; long-sleep implants that wake hourly or daily exist specifically to survive containment of the primary channel. Average the intervals rather than judging by eye."},
+{"h":"Fingerprints","p":"TLS client fingerprints (JA3), certificate anomalies (self-signed, CN=localhost, freshly issued), hardcoded user-agents and consistent URI paths identify tooling across rotating infrastructure."},
+{"h":"Internal pivots","p":"Hosts with no internet route are controlled through a relay - typically an SMB named pipe to a peer that does have egress. If a compromised host cannot reach the internet, find what it is talking to instead."},
+{"h":"Containment","p":"Block every channel simultaneously: external addresses and domains, DNS sinkholing, and isolation of the relay host. Sequential blocking warns a human operator to adapt."},
+{"h":"MITRE","p":"T1071.001 Web Protocols, T1071.004 DNS, T1090.001 Internal Proxy, T1573 Encrypted Channel, T1102 Web Service."}
+]},
+{"id":19,"title":"Data Exfiltration","part":"Attack Techniques","summary":"Collection, staging and transfer of stolen data.","sections":[
+{"h":"The three phases","p":"Collection (finding and reading the data), staging (compressing and often encrypting it into archives, usually in a temp or public directory), and transfer (over C2, DNS, cloud storage, email or removable media)."},
+{"h":"Why phases matter","p":"Each phase leaves different evidence. The staging archive is usually the best single artefact for quantifying impact, because it states exactly what was collected."},
+{"h":"Transfer channels","p":"The C2 channel itself for bulk data, DNS tunnelling for low-bandwidth or covert movement, commercial cloud storage via tools such as rclone, webmail, and physical media. Cloud storage is favoured because the destination is a legitimate service that most egress policies allow."},
+{"h":"Quantifying volume","p":"Convert what you observe into bytes and compare it against what was staged. DNS tunnels carry very little per query, so a large gap between staged volume and tunnel capacity proves another channel exists."},
+{"h":"What to record","p":"File counts, data classification, record counts and the specific shares or datasets accessed - and also what was not accessible. Legal and privacy teams need scope, not traffic descriptions."},
+{"h":"Anti-forensics","p":"Archives are commonly deleted after transfer. Volume shadow copies, USN journal entries and prefetch frequently defeat this."},
+{"h":"MITRE","p":"T1074.001 Local Data Staging, T1560.001 Archive via Utility, T1048.003 Exfiltration Over Alternative Protocol, T1567.002 Exfiltration to Cloud Storage."}
+]},
+{"id":20,"title":"Threat Intelligence","part":"Analysis","summary":"Turning knowledge about adversaries into better decisions.","sections":[
+{"h":"Three layers","p":"Tactical intelligence is indicators - short-lived and immediately actionable. Operational intelligence is tradecraft: tools, techniques and sequencing. Strategic intelligence is targeting, motive and trend."},
+{"h":"Attribution","p":"A confidence judgement, never a certainty. It rests on overlap across multiple independent axes: infrastructure, tooling artefacts, tradecraft and targeting. A single shared IP proves nothing; hosting is shared."},
+{"h":"Expressing confidence","p":"State low, moderate or high confidence, the evidence supporting it, and what would change your assessment. Analysts who never express uncertainty are eventually wrong in public."},
+{"h":"Making it actionable","p":"Intelligence must change a decision. If the actor's profile says exfiltration precedes extortion within 72 hours, containment urgency changes. If it does not change anything, it is decoration."},
+{"h":"Naming","p":"The same group carries different names across vendors. Track the behaviour and the artefacts; treat the name as a label for correlation, not as knowledge in itself."},
+{"h":"Common mistakes","p":"Using intelligence to skip evidence collection, over-attributing on commodity tooling, or letting a compelling actor narrative drive conclusions the logs do not support."}
+]}
+]

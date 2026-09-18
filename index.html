@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOC Analyst Training </title>
+<meta name="description" content="Practical SOC analyst training platform: 30 sequential investigations, evidence-driven cases and a full incident report assessment.">
+<link rel="stylesheet" href="soc.css">
+<link rel="stylesheet" href="brand.css">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preload" as="image" href="logo.webp" type="image/webp">
+<script src="intro.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<!-- brand intro: left + right halves of the logo collide into the full mark (<=2s) -->
+<div class="brand-intro" id="brandIntro" aria-hidden="true">
+  <div class="brand-intro__streaks"><i></i><i></i><i></i><i></i></div>
+  <div class="brand-intro__stage">
+    <span class="brand-intro__glow"></span>
+    <span class="brand-intro__half brand-intro__half--l">
+      <picture><source srcset="logo.webp" type="image/webp"><img src="logo.png" alt="" decoding="async"></picture>
+    </span>
+    <span class="brand-intro__half brand-intro__half--r">
+      <picture><source srcset="logo.webp" type="image/webp"><img src="logo.png" alt="" decoding="async"></picture>
+    </span>
+    <span class="brand-intro__ring"></span>
+    <span class="brand-intro__flash"></span>
+  </div>
+</div>
+
+<!-- subtle background watermark, always behind content -->
+<div class="brand-watermark" aria-hidden="true">
+  <picture><source srcset="logo.webp" type="image/webp"><img src="logo.png" alt="" loading="lazy" decoding="async"></picture>
+</div>
+
+<header class="topbar">
+  <div class="brand"><img class="brand-mark" src="logo.png" alt="SOC Analyst by Aashir Rajpoot" width="760" height="719">SOC Analyst<span> By Aashir Rajpoot</span></div>
+  <nav id="nav" aria-label="Primary">
+    <button data-page="dashboard">Dashboard</button>
+    <button data-page="levels">Investigations</button>
+    <button data-page="tools">Cases &amp; Tools</button>
+    <button data-page="progress">Progress</button>
+    <button data-page="book">Book</button>
+  </nav>
+  <div class="status" id="status" aria-live="polite"></div>
+</header>
+
+<main id="main" class="wrap" tabindex="-1">
+  <div class="card"><p class="muted">Loading platform data…</p></div>
+</main>
+
+<div class="wrap footer">
+  <span>Training environment. Every host, account, address, domain and incident in this platform is fictional. No command is executed against your machine.</span>
+  <button id="adminlink">Platform administration</button>
+</div>
+
+<button class="palette-fab btn-primary" id="fab" title="Command reference (CTRL+SHIFT+C then D)">Commands</button>
+<div class="overlay" id="palette" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="levels.js"></script>
+<script src="eval.js"></script>
+<script src="book.js"></script>
+<script src="commands.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
