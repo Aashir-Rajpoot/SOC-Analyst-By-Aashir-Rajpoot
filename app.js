@@ -113,7 +113,28 @@
     return state.work[k];
   }
   function isDone(id) { return !!state.completed[String(id)]; }
-  function isUnlocked(id) { return +id === 1 || isDone(+id - 1); }
+
+  /* ---- admin overrides (Feature 2/3): read-only from this app's point of
+     view, written by admin.html. Safe/soft - disabling a level never
+     deletes its authored data, it just hides it as unavailable, and
+     disabling a stage auto-passes its gate so the flow still works. ---- */
+  function adminLevelDisabled(id) {
+    try {
+      var raw = localStorage.getItem("soc_admin_level_overrides_v1");
+      if (!raw) return false;
+      var o = JSON.parse(raw);
+      return !!(o && o[String(id)] && o[String(id)].enabled === false);
+    } catch (e) { return false; }
+  }
+  function adminSections() {
+    try {
+      var raw = localStorage.getItem("soc_admin_sections_v1");
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function sectionDisabled(name) { return adminSections()[name] === false; }
+
+  function isUnlocked(id) { return (+id === 1 || isDone(+id - 1)) && !adminLevelDisabled(id); }
   function doneCount() {
     var n = 0;
     for (var i = 1; i <= 30; i++) if (isDone(i)) n++;
@@ -145,6 +166,7 @@
     return state.theory[k];
   }
   function theoryDone(lv) {
+    if (sectionDisabled("theory")) return true;
     var ch = chaptersFor(lv), ts = theoryState(lv.id);
     for (var i = 0; i < ch.length; i++) if (ts.read.indexOf(ch[i].id) === -1) return false;
     return ch.length > 0;
@@ -188,7 +210,7 @@
     if (!state.quiz[k]) state.quiz[k] = { passed: false, bestPct: 0, attempts: 0, set: null, answers: {} };
     return state.quiz[k];
   }
-  function quizPassed(lv) { return !!quizStateOf(lv.id).passed; }
+  function quizPassed(lv) { return sectionDisabled("quiz") || !!quizStateOf(lv.id).passed; }
   function shuffle(arr) {
     var a = arr.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -250,7 +272,7 @@
     if (!state.guided[k]) state.guided[k] = { done: false, step: 0, seen: [] };
     return state.guided[k];
   }
-  function guidedDone(lv) { return !!guidedStateOf(lv.id).done; }
+  function guidedDone(lv) { return sectionDisabled("guided") || !!guidedStateOf(lv.id).done; }
 
   /* ---- skill-based assessment breakdown, used on the case-result screen and the progress dashboard ---- */
   var SKILLS = ["Alert Triage", "Evidence Analysis", "Risk Assessment", "Escalation", "Documentation"];
@@ -497,7 +519,14 @@
     $$("#nav button").forEach(function (b) {
       if (b.dataset.page === r.page) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
+      if (b.dataset.page === "book") b.hidden = sectionDisabled("book");
     });
+    var aboutLink = $("#navAbout");
+    if (aboutLink) aboutLink.hidden = sectionDisabled("about");
+    document.body.setAttribute("data-ai-assistant", sectionDisabled("ai") ? "off" : "on");
+    var aiFab = $(".ai-fab"), aiPanel = $(".ai-panel");
+    if (aiFab) aiFab.style.display = sectionDisabled("ai") ? "none" : "";
+    if (aiPanel) aiPanel.style.display = sectionDisabled("ai") ? "none" : "";
     $("#status").textContent = doneCount() + "/30 complete  -  hints " + hintsLeft() + "/" + HINT_MAX;
     afterRender(r);
     window.scrollTo(0, 0);
@@ -555,7 +584,8 @@
         '<span class="small muted">' + esc(lv.domain) + '</span><br>' +
         (done ? '<span class="tag">CLOSED ' + rec.pct + '%</span>'
           : open ? '<span class="tag">AVAILABLE</span>'
-            : '<span class="tag">LOCKED - needs level ' + pad(lv.id - 1) + '</span>') +
+            : adminLevelDisabled(lv.id) ? '<span class="tag">DISABLED BY ADMIN</span>'
+              : '<span class="tag">LOCKED - needs level ' + pad(lv.id - 1) + '</span>') +
         '</button>';
     });
     return out + '</div>';
@@ -566,6 +596,14 @@
     var lv = levelById(id);
     if (!lv) return '<div class="card"><h2>Unknown level</h2></div>';
     if (!isUnlocked(id)) {
+      if (adminLevelDisabled(id)) {
+        return '<div class="card"><div class="locked-notice">' +
+          '<div class="big">LEVEL ' + pad(id) + '</div>' +
+          '<div class="lk">TEMPORARILY DISABLED</div>' +
+          '<p>This level has been temporarily disabled by an administrator. Its content is preserved and can be re-enabled at any time.</p>' +
+          '<button class="btn-primary" onclick="location.hash=\'#/\'">Back to dashboard</button>' +
+          '</div></div>';
+      }
       return '<div class="card"><div class="locked-notice">' +
         '<div class="big">LEVEL ' + pad(id) + '</div>' +
         '<div class="lk">LOCKED</div>' +
@@ -1323,7 +1361,9 @@
     /* theory: mark chapter learned */
     $$("[data-readchapter]").forEach(function (b) {
       b.addEventListener("click", function () {
+        var wasDone = theoryDone(lv);
         markChapterRead(lv, b.dataset.readchapter);
+        if (!wasDone && theoryDone(lv) && window.SOCPopup) window.SOCPopup.trigger("theory", lv.id);
         render();
       });
     });
@@ -1343,6 +1383,7 @@
       if (unanswered && !confirm(unanswered + " question(s) unanswered. Submit anyway? Unanswered questions score as incorrect.")) return;
       var res = gradeQuizSet(lv);
       view.quizResult[lv.id] = res;
+      if (res.pct === 100 && window.SOCPopup) window.SOCPopup.trigger("quiz", lv.id);
       render();
     });
     var qretry = $("[data-quizretry]");
@@ -1389,6 +1430,7 @@
       gs.done = true; save();
       view.stage[lv.id] = "work";
       toast("Guided Investigation Completed. Real Investigation Unlocked.");
+      if (window.SOCPopup) window.SOCPopup.trigger("guided", lv.id);
       render();
     });
   }
@@ -1470,6 +1512,7 @@
       view.lastGrade = g;
       save();
       if (g.pct >= PASS && lv.id === 30) toast("Master investigation closed. Book unlocked.");
+      if (window.SOCPopup) window.SOCPopup.trigger(g.pct >= PASS ? "assessment" : "investigation", lv.id);
       render();
     });
 
