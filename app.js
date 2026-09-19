@@ -972,7 +972,8 @@
       out += '<div class="card"><h2>Next task</h2><p>' + esc(lv.next) + '</p>' +
         (lv.id < 30 ? '<button class="btn-primary" onclick="location.hash=\'#/level/' + (lv.id + 1) + '\'">Start next investigation</button>'
           : '<div class="notice ok"><strong>MASTER SOC ANALYST.</strong> All 30 investigations closed, including the master multi-stage assessment and its full incident report. The Zero-to-Hero SOC Analyst book is now unlocked.</div>' +
-          '<button class="btn-primary" onclick="location.hash=\'#/book\'">Open the book</button>') +
+          '<div class="notice ok" style="text-align:center;margin-top:.6rem"><div style="font-family:var(--mono);letter-spacing:.14em;font-weight:700">30 / 30 LEVELS COMPLETE</div><strong>SOC Analyst Training Completed.</strong> Your Zero-to-Hero SOC Analyst Book is now unlocked.</div>' + guideButtons(true) +
+          '<button class="btn-primary" onclick="location.hash=\'#/book\'">Open the book page</button>') +
         ' <button class="btn-ghost" data-stage="work" data-level="' + lv.id + '">Reopen this case</button>' +
         '</div>';
     } else {
@@ -1062,19 +1063,45 @@
     if (ov) return { id: base.id, title: ov.title || base.title, part: base.part, summary: ov.summary || base.summary, sections: ov.sections || base.sections };
     return base;
   }
+  /* Field Guide (soc-book.html): two separate editions + PDF. Lock rule is the same as the existing book. */
+  var GUIDE_EDITIONS = [
+    { code: "en", name: "English Edition", note: "Natural professional English." },
+    { code: "ur", name: "Roman Urdu Edition", note: "Alag likhi hui mukammal Roman Urdu kitab." }
+  ];
+  function guideButtons(compact) {
+    return '<div class="row" style="gap:.8rem;flex-wrap:wrap;margin-top:.8rem">' + GUIDE_EDITIONS.map(function (e) {
+      return '<div class="card" style="flex:1 1 240px;margin:0"><h3 style="margin-top:0">' + e.name + '</h3>' +
+        (compact ? "" : '<p class="small muted">' + e.note + '</p>') +
+        '<a class="btn-primary" style="text-decoration:none;display:inline-block;margin:.15rem .3rem .15rem 0;padding:.5rem .9rem;border-radius:8px" href="soc-book.html?lang=' + e.code + '" target="_blank" rel="noopener">Read online</a>' +
+        '<a class="btn-ghost" style="text-decoration:none;display:inline-block;margin:.15rem 0;padding:.5rem .9rem;border-radius:8px" href="soc-book.html?lang=' + e.code + '&dl=1" target="_blank" rel="noopener">Download PDF</a></div>';
+    }).join("") + '</div>';
+  }
+  function guideCard() {
+    var complete = doneCount() >= 30;
+    return '<div class="card"><div class="notice ok" style="text-align:center">' +
+      (complete
+        ? '<div style="font-family:var(--mono);letter-spacing:.14em;font-weight:700">30 / 30 LEVELS COMPLETE</div><h1 style="margin:.3rem 0">SOC Analyst Training Completed</h1><p style="margin:0">Congratulations! Your Zero-to-Hero SOC Analyst Book is now unlocked.</p>'
+        : '<div style="font-family:var(--mono);letter-spacing:.1em;font-weight:700">BOOK ACCESS GRANTED FOR REVIEW</div><h1 style="margin:.3rem 0">SOC Analyst By Aashir Rajpoot</h1>') +
+      '</div><h2>Zero to Hero \u2014 Complete SOC Analyst Field Guide</h2>' +
+      '<p class="muted small">Two separate complete editions, with a searchable reader and a downloadable PDF (cover, page numbers and watermark included).</p>' +
+      guideButtons(false) + '</div>';
+  }
   function viewBook() {
     if (!bookUnlocked()) {
+      var pct = Math.round(doneCount() / 30 * 100);
       return '<div class="card"><div class="locked-notice">' +
-        '<div class="big">ZERO-TO-HERO SOC ANALYST</div>' +
-        '<div class="lk">LOCKED</div>' +
-        '<p>Requirement: Complete all 30 levels, including the master investigation.</p>' +
-        '<p class="small muted">Progress: ' + doneCount() + '/30</p>' +
+        '<div class="lk" style="font-size:2rem">&#128274;</div>' +
+        '<div class="big">SOC Analyst Zero to Hero Book</div>' +
+        '<p><strong>Complete all 30 training levels to unlock your complete field guide.</strong></p>' +
+        '<div class="bar" style="max-width:420px;margin:.6rem auto"><i style="width:' + pct + '%"></i></div>' +
+        '<p class="small" style="font-family:var(--mono)">' + doneCount() + ' / 30 Levels Completed</p>' +
+        '<p class="small muted">English and Roman Urdu editions (with PDF download) unlock together.</p>' +
         '<button class="btn-primary" onclick="location.hash=\'#/levels\'">Back to the investigation path</button>' +
         '</div></div>';
     }
     var parts = {};
     BOOK.forEach(function (c) { (parts[c.part] = parts[c.part] || []).push(c); });
-    var out = '<div class="card"><h1>Zero to Hero - SOC Analyst</h1>' +
+    var out = guideCard() + '<div class="card"><h1>Zero to Hero - SOC Analyst</h1>' +
       '<p class="muted small">Thirty chapters, unlocked by completing every investigation. Written to be read in order, but each chapter stands alone as reference.</p></div>';
     Object.keys(parts).forEach(function (p) {
       out += '<div class="card"><h2>' + esc(p) + '</h2><div class="chapters">' +
