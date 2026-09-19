@@ -51,6 +51,10 @@ app.js                    all application logic (state, routing, grading, tools,
 levels.js                 generated - public level payload, answer keys removed
 eval.js                   generated - encoded evaluation payload (keys, hints, reviews, quiz answers)
 book.js                   generated - 30 book chapters
+soc-book.html             SOC Analyst By Aashir Rajpoot field guide: English + Roman Urdu editions,
+                          reader, search and built-in PDF generator (single self-contained file).
+                          Opens only when 30/30 levels are done, the admin grants access, or an admin
+                          opens it from the Admin Panel > Book tab. PDF is generated in the browser.
 commands.js               generated - 45-entry command reference
 levels_a..d.json          authored levels 1-29 (each may include chapters / quizBank / guided)
 levels_master.json        authored level 30 (master assessment)
