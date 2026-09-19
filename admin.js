@@ -139,6 +139,7 @@
   });
   $("#logoutBtn").addEventListener("click", function () {
     setAuthed(false);
+    try { localStorage.removeItem("soc_book_admin_pass_v1"); } catch (e) {}
     shell.classList.remove("show");
     loginScreen.style.display = "flex";
     $("#loginPass").value = "";
@@ -348,11 +349,21 @@
   var bookSearchTerm = "", bookOpenId = (BOOK[0] || {}).id;
   function renderBook(root) {
     root.innerHTML =
+      '<div class="a-card" style="margin-bottom:1rem"><h3 style="margin-top:0">Zero-to-Hero Field Guide (English + Roman Urdu)</h3>' +
+      '<p class="a-note">Admins can always open both editions without completing the 30 levels.</p>' +
+      '<div class="a-row" style="flex-wrap:wrap;gap:.5rem">' +
+      '<a class="a-btn" data-guide="en" href="soc-book.html?lang=en" target="_blank" rel="noopener">Open English Book</a>' +
+      '<a class="a-btn" data-guide="ur" href="soc-book.html?lang=ur" target="_blank" rel="noopener">Open Roman Urdu Book</a>' +
+      '<a class="a-btn" data-guide="en" href="soc-book.html?lang=en&dl=1" target="_blank" rel="noopener">PDF (English)</a>' +
+      '<a class="a-btn" data-guide="ur" href="soc-book.html?lang=ur&dl=1" target="_blank" rel="noopener">PDF (Roman Urdu)</a></div></div>' +
       '<input class="a-field" style="max-width:320px" type="text" id="bookSearch" placeholder="Search chapters\u2026" value="' + esc(bookSearchTerm) + '">' +
       '<div class="a-book" style="margin-top:.9rem">' +
       '<div class="a-book__list" id="bookList"></div>' +
       '<div class="a-book__reader" id="bookReader"></div>' +
       '</div>';
+    $$("[data-guide]", root).forEach(function (l) {
+      l.addEventListener("click", function () { try { localStorage.setItem("soc_book_admin_pass_v1", String(Date.now())); } catch (e) {} });
+    });
     $("#bookSearch").addEventListener("input", function () { bookSearchTerm = this.value; paintBookList(); });
     paintBookList();
     paintBookReader();
